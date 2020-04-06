@@ -189,13 +189,3 @@ if __name__=="__main__":
     print("bkg -> psd: ", 1/np.mean(psd/backg_model))
     print("gp -> psd: ", 1/np.mean(psd/gran_model))
     plt.show()
-
-    
-
-    plt.hist(ps.power.value/gran, bins=300, histtype='step', density=True)
-    plt.hist(ps.power.value/psd, bins=300, histtype='step', density=True)
-    from scipy.stats import chi2
-    plt.hist(chi2.rvs(2, size=10000)/2, bins=100, histtype='step', density=True)
-
-    plt.show()
-
