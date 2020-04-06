@@ -84,7 +84,7 @@ class Granulation(object):
         # Convert amplitude from units of ppm/uHz^1/2 into units of ppm / day^1/2 for GP
         new_a = self.amplitude# * np.sqrt(1e6/86400.0)
 
-        return (new_a**2 / omega_w)*np.sqrt(np.pi) * (1e6/86400.0), obmega_w / (1e6/86400.0)
+        return (new_a**2 / omega_w)*np.sqrt(np.pi) * (1e6/86400.0), omega_w / (1e6/86400.0)
 
     def gran_backg(self, frequency):
 
