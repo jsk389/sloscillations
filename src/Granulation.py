@@ -34,18 +34,6 @@ class Granulation(object):
             Value of white noise level in time-domain, if not 
             set then defaults to 0
 
-        Returns
-        -------
-        string
-            a value in a string
-
-        Raises
-        ------
-        KeyError
-            when a key error
-        OtherError
-            when an other error
-
         """
 
         self.time = time
