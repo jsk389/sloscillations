@@ -180,14 +180,7 @@ if __name__=="__main__":
     # Get back into correct units
     psd *= (2 / (t.max().value))
     psd *= (2 / (f[1]-f[0]))
-    #psd /= 1e6
-#    psd = psd * 2 * bw
-#    psd *= 4 * np.sqrt(2)
 
-    #psd /= 1e6
-    #psd *= (2*np.sqrt(2*np.pi))
-
-    #psd /= uHz_conv / (4*np.sqrt(2))
     plt.plot(ps.frequency, ps.power, color='k')
     plt.plot(f, psd, color='r')
     backg_model = gran.gran_backg(f)
@@ -200,14 +193,6 @@ if __name__=="__main__":
     print("a^2", amps**2/freqs * (2*np.sqrt(2)/np.pi))
     print((S0*4*np.sqrt(2/np.pi) / (1e6/86400.0))/(amps**2/freqs * (2*np.sqrt(2)/np.pi)))
 
-    #sys.exit()
-    #cond = (f <= f.max())#(f < 100e-6)
-    #print("RATIO 1: ", np.sum(ps.power)/np.sum(gran))
-    #print("RATIO 2: ", np.sum(gran)/np.sum(psd))
-    #print("RATIO 3: ", np.sum(ps.power)/np.sum(psd))
-    #print("RATIO 1: ", np.mean(ps.power[cond]/gran[cond]))
-    #print("RATIO 2: ", 1/np.mean(gran[cond]/psd[cond]))
-    #print("RATIO 3: ", 1/np.mean(ps.power[cond]/psd[cond]))
     for i in freqs:
         plt.axvline(i, color='r', linestyle='--')
     plt.plot(f, gran_model, color='C0')

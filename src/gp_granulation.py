@@ -83,9 +83,6 @@ if __name__=="__main__":
     # model from Kallinger (2014)
     y = gp.sample()
 
-    #plt.plot(t/86400.0, y)
-    #plt.show()
-
     y = y*cds.ppm
     print(y)
     lc = lk.LightCurve(time=t, flux=y)
@@ -95,10 +92,7 @@ if __name__=="__main__":
     #fs = (1./(lc.time[-1] - lc.time[0])) / oversample_factor
     ps = lc.to_periodogram(normalization='psd',
                            freq_unit=u.microhertz)
-                           #maximum_frequency=nyq*1e6*u.microhertz,
-                           #minimum_frequency=bw*1e6*u.microhertz)
-    #ps.plot()
-    #plt.show()
+
 
 
     f = np.arange(bw, nyq, bw) * 1e6
@@ -111,28 +105,11 @@ if __name__=="__main__":
     # Get back into correct units
     psd *= (2 / (t.max().value))
     psd *= (2 / (f[1]-f[0]))
-    #psd /= 1e6
-#    psd = psd * 2 * bw
-#    psd *= 4 * np.sqrt(2)
 
-    #psd /= 1e6
-    #psd *= (2*np.sqrt(2*np.pi))
-
-    #psd /= uHz_conv / (4*np.sqrt(2))
     plt.plot(ps.frequency, ps.power)
     plt.plot(f, psd, color='r')
     plt.plot(f, backg_model*10, color='g')
     gran = gran_backg(f, amps, freqs)
-    #cond = (f <= f.max())#(f < 100e-6)
-    #print("RATIO 1: ", np.sum(ps.power)/np.sum(gran))
-    #print("RATIO 2: ", np.sum(gran)/np.sum(psd))
-    #print("RATIO 3: ", np.sum(ps.power)/np.sum(psd))
-    #print("RATIO 1: ", np.mean(ps.power[cond]/gran[cond]))
-    #print("RATIO 2: ", 1/np.mean(gran[cond]/psd[cond]))
-    #print("RATIO 3: ", 1/np.mean(ps.power[cond]/psd[cond]))
-
-    #plt.plot(f*1e6, gran, color='r')
-    #plt.plot(f*1e6, backg_model)
     plt.show()
 
     plt.hist(ps.power.value/gran, bins=300, histtype='step', density=True)
