@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import astropy.units as u
 import celerite
 import lightkurve as lk
