@@ -133,7 +133,7 @@ if __name__=="__main__":
     # White noise level (in ppm)
     white = 1.0
     # Compute the kernel of the oscillation mode
-    osc = Oscillation(t)
+    osc = Oscillations(t)
     kernel, gp = osc.compute_gp(params, white=white)
     # Compute
     gp.compute(t.value)
