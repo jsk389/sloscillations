@@ -82,7 +82,7 @@ class Granulation(object):
 
         if np.isscalar(self.amplitude):
             self.amplitude = np.array([self.amplitude]*self.n_comps)
-        model = np.zeros(len(f))
+        model = np.zeros(len(frequency))
         for i in range(len(self.frequencies)):
             height = ((2.0 * np.sqrt(2))/np.pi) * self.amplitude[i]**2/self.frequencies[i]
             model += height / (1 + (frequency/self.frequencies[i])**4)
@@ -111,8 +111,8 @@ class Granulation(object):
         omega0 = 2*np.pi*self.frequencies
         omega = frequency * 2 * np.pi
         model = np.zeros(len(frequency))
-        for i in range(len(S0)):
-            model += (np.sqrt(2/np.pi)*(S0[i]) / ((omega/omega0[i])**4 + 1))
+        for i in range(len(self.S0)):
+            model += (np.sqrt(2/np.pi)*(self.S0[i]) / ((omega/omega0[i])**4 + 1))
         return model
 
 if __name__=="__main__":

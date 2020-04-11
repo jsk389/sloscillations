@@ -1,8 +1,16 @@
 # -*- coding: utf-8 -*-
 
-from ..Oscillations import Oscillations
+import astropy.units as u
+import lightkurve as lk
+import numpy as np
+import pytest
 
-print("SAFE")
+from astropy.units import cds
+from sloscillations import oscillations
+
+import matplotlib.pyplot as plt
+
+cds.enable()
 
 def test_oscillations():
     # Cadence in seconds
@@ -21,7 +29,7 @@ def test_oscillations():
     # White noise level (in ppm)
     white = 1.0
     # Compute the kernel of the oscillation mode
-    osc = Oscillation(t)
+    osc = oscillations.Oscillations(t)
     kernel, gp = osc.compute_gp(params, white=white)
     # Compute
     gp.compute(t.value)
@@ -56,4 +64,17 @@ def test_oscillations():
     # Get back into correct units i.e. normalisation
     psd *= (2 / (t.max().value))
     psd *= (2 / (f[1]-f[0]))
+    psd += (2e-6*white**2*dt)
 
+    #plt.plot(f, psd)
+    #plt.plot(f, lor)
+    #plt.show()
+
+    #plt.plot(f, psd/lor)
+    #plt.show()
+
+    assert np.allclose(psd, full)
+
+if __name__=="__main__":
+
+    test_oscillations()

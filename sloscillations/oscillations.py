@@ -8,7 +8,7 @@ import numpy as np
 
 from astropy.units import cds
 from celerite import terms
-from AsteroTerm import AsteroTerm
+from .asteroterm import AsteroTerm
 cds.enable()
 
 class Oscillations(object):
