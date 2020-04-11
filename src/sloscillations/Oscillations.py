@@ -11,7 +11,7 @@ from celerite import terms
 from AsteroTerm import AsteroTerm
 cds.enable()
 
-class Oscillation(object):
+class Oscillations(object):
     """
     Class to generate oscillation modes using a 
     Gaussian process in the time domain
