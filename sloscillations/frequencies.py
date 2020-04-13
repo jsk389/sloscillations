@@ -6,7 +6,7 @@ import scaling_relations as scalings
 
 import matplotlib.pyplot as plt
 
-class Frequencies:
+class Frequencies(object):
 
     def __init__(self, frequency, numax, delta_nu, radial_order_range=[-5, 5]):
 
