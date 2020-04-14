@@ -142,7 +142,6 @@ class Frequencies(object):
         plt.xlim(0, self.delta_nu)
         plt.xlabel(r'$\nu$ mod $\Delta\nu$ ($\mu$Hz)', fontsize=18)
         plt.ylabel(r'Frequency ($\mu$Hz)', fontsize=18)
-        #plt.legend(loc='best', title='Mode degree')
         plt.show()
 
     def __call__(self, entries):
