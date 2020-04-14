@@ -213,32 +213,4 @@ if __name__=="__main__":
 
     # Plot and echelle to check everything makes sense
     frequencies.plot_echelle(mixed=True, rotation=True)
-
-
-    #plt.plot(frequencies.l0_freqs % frequencies.delta_nu - frequencies.epsilon_p + 0.1*frequencies.delta_nu, 
-    #         frequencies.l0_freqs,
-    #         color='r', marker='D', label='$\ell=0$', linestyle='None', zorder=1, markersize=5)
-    #plt.plot(frequencies.l2_freqs % frequencies.delta_nu - frequencies.epsilon_p + 0.1*frequencies.delta_nu, 
-    #         frequencies.l2_freqs, 
-    #         color='g', marker='s', label='$\ell=2$', linestyle='None', zorder=1, markersize=5)
-    #plt.plot(frequencies.l1_nom_freqs % frequencies.delta_nu - frequencies.epsilon_p + 0.1*frequencies.delta_nu, 
-    #         frequencies.l1_nom_freqs, 
-    #         color='b', marker='o', label='Nominal $\ell=1$', linestyle='None', zorder=1, markersize=5)
-    #for i in range(len(frequencies.l1_mixed_freqs)):
-    #    color = next(plt.gca()._get_lines.prop_cycler)['color']
-    #    plt.plot(frequencies.l1_mixed_freqs[i] % frequencies.delta_nu - frequencies.epsilon_p + 0.1*frequencies.delta_nu, 
-    #             frequencies.l1_mixed_freqs[i], 
-    #             color=color, marker='v', label='Mixed $\ell=1$, $m=0$', linestyle='None', zorder=0, markersize=3)
-    #    plt.plot(frequencies.l1_mixed_freqs_p1[i] % frequencies.delta_nu - frequencies.epsilon_p + 0.1*frequencies.delta_nu, 
-    #             frequencies.l1_mixed_freqs_p1[i],
-    #             color=color, marker='<', label='Mixed $\ell=1$, $m=+1$', linestyle='None', zorder=0, markersize=3)
-    #    plt.plot(frequencies.l1_mixed_freqs_n1[i] % frequencies.delta_nu - frequencies.epsilon_p + 0.1*frequencies.delta_nu, 
-    #             frequencies.l1_mixed_freqs_n1[i], 
-    #             color=color, marker='>', label='Mixed $\ell=1$, $m=-1$', linestyle='None', zorder=0, markersize=3)
-    #plt.xlim(0, frequencies.delta_nu)
-    #plt.xlabel(r'$\nu$ mod $\Delta\nu$ ($\mu$Hz)', fontsize=18)
-    #plt.ylabel(r'Frequency ($\mu$Hz)', fontsize=18)
-    ##plt.legend(loc='best', title='Mode degree')
-    #plt.show()
-
     
