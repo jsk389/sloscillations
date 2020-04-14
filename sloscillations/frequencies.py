@@ -145,6 +145,49 @@ class Frequencies(object):
         #plt.legend(loc='best', title='Mode degree')
         plt.show()
 
+    def __call__(self, entries):
+        """
+        Run computation
+        """
+        # Update class attributes with new parameters
+        self.__dict__.update(entries)
+
+        # l=0 modes
+        self.generate_radial_modes()
+        # l=2 modes
+        self.generate_quadrupole_modes()
+        # l=1 nominal p-modes
+        self.generate_nominal_dipole_modes()  
+        # l=1 mixed modes
+        if self.calc_mixed:
+            self.generate_mixed_dipole_modes(DPi1=self.DPi1, 
+                                             coupling=self.coupling, 
+                                             eps_g=self.eps_g)
+            if self.calc_rot:
+                # l=1 rotation
+                if self.method == 'simple':
+                    # This is for consistency between formulations, so simple and Mosser
+                    # give same results for given core splitting.
+                    self.split_core *= 2
+                self.generate_rotational_splittings(split_core=self.split_core, 
+                                                        DPi1=self.DPi1, 
+                                                        coupling=self.coupling, 
+                                                        eps_g=self.eps_g, 
+                                                        split_env=self.split_env, 
+                                                        l=1, method=self.method)     
+        if (self.calc_rot) & (self.l > 1):
+            # l=1 rotation
+            if self.method == 'simple':
+                # This is for consistency between formulations, so simple and Mosser
+                # give same results for given core splitting.
+                self.split_core *= 2
+            self.generate_rotational_splittings(split_core=self.split_core, 
+                                                    DPi1=self.DPi1, 
+                                                    coupling=self.coupling, 
+                                                    eps_g=self.eps_g, 
+                                                    split_env=self.split_env, 
+                                                    l=1, method=self.method)     
+
 if __name__=="__main__":
     
 
@@ -156,30 +199,20 @@ if __name__=="__main__":
                               delta_nu=9.57, 
                               radial_order_range=[-5, 5])
 
-    # l=0 modes
-    frequencies.generate_radial_modes()
-
-    # l=2 modes
-    frequencies.generate_quadrupole_modes()
-
-    # l=1 nominal p-modes
-    frequencies.generate_nominal_dipole_modes()
-
-    # l=1 mixed modes
-    frequencies.generate_mixed_dipole_modes(DPi1=77.9, 
-                                            coupling=0.2, 
-                                            eps_g=0.0)
-
-    # l=1 rotation
-    frequencies.generate_rotational_splittings(split_core=0.5, 
-                                               DPi1=77.9, 
-                                               coupling=0.2, 
-                                               eps_g=0., 
-                                               split_env=0., 
-                                               l=1, method='Mosser')
+    # Eventually want this to read in from a configuration file
+    params = {'calc_mixed': True,
+              'calc_rot': True,
+              'DPi1': 77.9,
+              'coupling': 0.2,
+              'eps_g': 0.0,
+              'split_core': 0.5,
+              'split_env': 0.0,
+              'l': 1,
+              'method': 'simple'}
+    frequencies(params)
 
     # Plot and echelle to check everything makes sense
-    frequencies.plot_echelle()
+    frequencies.plot_echelle(mixed=True, rotation=True)
 
 
     #plt.plot(frequencies.l0_freqs % frequencies.delta_nu - frequencies.epsilon_p + 0.1*frequencies.delta_nu, 

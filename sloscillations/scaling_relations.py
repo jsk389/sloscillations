@@ -92,11 +92,27 @@ def gamma_0_scaling(Teff=4800, deterministic=True):
     """
     Use scaling relation from Corsaro et al. 2012
     gamma = gamma0*exp[(Teff-5777)/T0]
+    with updated parameters from Lund et al. (2016)
     """
     if deterministic:
-        gamma0 = 1.39
-        T0 = 601
+        gamma0 = 1.02 #1.39
+        T0 = 436 #601
     else:
-        gamma0 = np.random.normal(1.39, 0.1)
-        T0 = np.random.normal(601, 3)
+        gamma0 = np.random.normal(1.02, 0.07) #1.39, 0.1)
+        T0 = np.random.normal(436, 24) #601, 3)
     return gamma0*np.exp((self.Teff-5777)/T0)   
+
+def gamma_scaling(numax, deterministic=True):
+    """
+    Use the linewidth relation from Appourchaux et al. (2014a) which
+    has been modified by Lund et al. (2016) and using values from
+    Lund et al. (2016)
+    """
+    alpha = 2.95 * (numax/3090) + 0.39
+    gamma_a = 3.08 * (numax/3090) + 3.32
+    gamma_dip = -0.47 * (numax/3090) + 0.62
+    W_dip = 4637 * (numax / 3090) - 141
+    nu_dip = 2984 * (numax / 3090) + 60
+    fwhm_dip = 1253 * (numax / 3090) - 85
+
+    return alpha, gamma_a, gamma_dip, W_dip, nu_dip, fwhm_dip

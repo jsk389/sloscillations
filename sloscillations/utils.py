@@ -8,6 +8,18 @@ import numpy as np
 
 from celerite import terms
 
+import scaling_relations as scalings
+
+def compute_linewidths(freqs, numax):
+    """
+    Compute mode linewidths using eqn 4.7 from Lund et al. (2016)
+    """
+    alpha, gamma_a, gamma_dip, W_dip, nu_dip, fwhm_dip = scalings.gamma_scaling(numax)
+    term1 = alpha * np.log(freqs / numax) + np.log(gamma_a)
+    term2 = np.log(gamma_dip) / (1 + ((2*np.log(freqs/nu_dip))/np.log(W_dip/numax))**2)
+
+    lnGamma = term1 + term2
+    return np.exp(lnGamma)
 
 def calculateS0(a, b):
     """
