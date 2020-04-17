@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import mixed_modes_utils as mixed_modes
+from . import mixed_modes_utils as mixed_modes
 import numpy as np 
-import scaling_relations as scalings
+from . import scaling_relations as scalings
 
 import matplotlib.pyplot as plt
 
@@ -67,17 +67,20 @@ class Frequencies(object):
                                 1)
         self.l1_nom_freqs, self.l1_l = self.asymptotic_expression(l=1, d0l=np.append(self.d01, self.d01[:2]), n=n)
 
-    def generate_mixed_dipole_modes(self, DPi1, coupling, eps_g):
+    def generate_mixed_dipole_modes(self, DPi1, coupling, eps_g, nom_p):
         """
         Generate l=1 mixed mode frequencies
         """
         self.l1_mixed_freqs, self.l1_zeta = mixed_modes.all_mixed_l1_freqs(self.delta_nu,
-                                                                           self.l1_nom_freqs,
+                                                                           nom_p,
                                                                            DPi1,
                                                                            eps_g,
                                                                            coupling,
-                                                                           calc_zeta=True)                                                        
-        cond = (self.l1_mixed_freqs > self.l1_nom_freqs.min()) & (self.l1_mixed_freqs < self.l1_nom_freqs.max())
+                                                                           calc_zeta=True)  
+        #if len(self.l1_nom_freqs) > 1:                                                      
+        #    cond = (self.l1_mixed_freqs > self.l1_nom_freqs.min()) & (self.l1_mixed_freqs < self.l1_nom_freqs.max())
+        #else:
+        cond = (self.l1_mixed_freqs > self.l1_nom_freqs - self.delta_nu/2) & (self.l1_mixed_freqs < self.l1_nom_freqs + self.delta_nu/2)
         self.l1_mixed_freqs = self.l1_mixed_freqs[cond]
         self.l1_zeta = self.l1_zeta[cond]
         # Still need to assign radial  order to mixed modes!
@@ -110,6 +113,20 @@ class Frequencies(object):
         else:
             pass
 
+    def generate_tau_values(self, DPi1, coupling, eps_g):
+        new_frequency, tau, zeta_func = mixed_modes.stretched_pds(self.frequency, 
+                                                    self.l1_nom_freqs,
+                                                    self.delta_nu, DPi1, coupling, eps_g)
+        self.l1_mixed_tau = mixed_modes.peaks_stretched_period(self.l1_mixed_freqs, 
+                                                               new_frequency, 
+                                                               tau)
+        self.l1_mixed_tau_p1 = mixed_modes.peaks_stretched_period(self.l1_mixed_freqs_p1, 
+                                                               new_frequency, 
+                                                               tau)
+        self.l1_mixed_tau_n1 = mixed_modes.peaks_stretched_period(self.l1_mixed_freqs_n1, 
+                                                               new_frequency, 
+                                                               tau)
+
     def plot_echelle(self, l0=True, l2=True, l1=True, mixed=True, rotation=True):
         """
         Plot an echelle of frequencies
@@ -123,7 +140,7 @@ class Frequencies(object):
                     self.l2_freqs, 
                     color='g', marker='s', label='$\ell=2$', linestyle='None', zorder=1, markersize=5)
         if l1:
-            plt.plot(self.l1_nom_freqs % frequencies.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
+            plt.plot(self.l1_nom_freqs % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
                     self.l1_nom_freqs, 
                     color='b', marker='o', label='Nominal $\ell=1$', linestyle='None', zorder=1, markersize=5)
         if mixed:
@@ -142,7 +159,7 @@ class Frequencies(object):
         plt.xlim(0, self.delta_nu)
         plt.xlabel(r'$\nu$ mod $\Delta\nu$ ($\mu$Hz)', fontsize=18)
         plt.ylabel(r'Frequency ($\mu$Hz)', fontsize=18)
-        plt.show()
+        #plt.show()
 
     def __call__(self, entries):
         """
@@ -152,16 +169,20 @@ class Frequencies(object):
         self.__dict__.update(entries)
 
         # l=0 modes
-        self.generate_radial_modes()
+        if self.calc_l0:
+            self.generate_radial_modes()
         # l=2 modes
-        self.generate_quadrupole_modes()
+        if self.calc_l2:
+            self.generate_quadrupole_modes()
         # l=1 nominal p-modes
-        self.generate_nominal_dipole_modes()  
+        if self.calc_nom_l1:
+            self.generate_nominal_dipole_modes()  
         # l=1 mixed modes
         if self.calc_mixed:
             self.generate_mixed_dipole_modes(DPi1=self.DPi1, 
                                              coupling=self.coupling, 
-                                             eps_g=self.eps_g)
+                                             eps_g=self.eps_g,
+                                             nom_p = self.l1_nom_freqs)
             if self.calc_rot:
                 # l=1 rotation
                 if self.method == 'simple':
@@ -179,7 +200,7 @@ class Frequencies(object):
             if self.method == 'simple':
                 # This is for consistency between formulations, so simple and Mosser
                 # give same results for given core splitting.
-                self.split_core *= 2
+                self.split_core /= 2
             self.generate_rotational_splittings(split_core=self.split_core, 
                                                     DPi1=self.DPi1, 
                                                     coupling=self.coupling, 

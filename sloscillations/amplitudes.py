@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
-import radial_mode_utils as radial_modes
+import .radial_mode_utils as radial_modes
 import numpy as np 
-import scaling_relations as scalings
+import .scaling_relations as scalings
 
-from frequencies import Frequencies
+from .frequencies import Frequencies
 from scipy.interpolate import interp1d
 
 class Amplitudes(Frequencies):
@@ -78,15 +78,17 @@ if __name__=="__main__":
                               numax=103.2, 
                               delta_nu=9.57, 
                               radial_order_range=[-5, 5])
-
-    # l=0 modes
-    #frequencies.generate_radial_modes()
-    # l=2 modes
-    #frequencies.generate_quadrupole_modes()
-    # l=1 nominal p-modes
-    #frequencies.generate_nominal_dipole_modes()
-    frequencies(DPi1=77.9, coupling=0.2, eps_g=0.0,
-                split_core=0.5, split_env=0.0, l=1, method='simple')
+    # Eventually want this to read in from a configuration file
+    params = {'calc_mixed': True,
+              'calc_rot': True,
+              'DPi1': 77.9,
+              'coupling': 0.2,
+              'eps_g': 0.0,
+              'split_core': 0.5,
+              'split_env': 0.0,
+              'l': 1,
+              'method': 'simple'}
+    frequencies(params)
 
     # Set up class
     amplitudes = Amplitudes(frequencies)

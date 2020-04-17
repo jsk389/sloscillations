@@ -122,7 +122,7 @@ def calculate_zeta(freq, nu_p, DeltaNu, DPi1, coupling, eps_g):
     
 def zeta_interp(freq, nu_p, delta_nu, 
                 DPi1, coupling, eps_g,
-                numDPi1=100, DPi1_range=[0.99, 1.01]):
+                numDPi1=100, DPi1_range=[0.99, 1.01], return_full=False):
     # Interpolate zeta function
     l1_freqs = []
     zeta = []
@@ -144,4 +144,60 @@ def zeta_interp(freq, nu_p, delta_nu,
 
 
     zeta_fun = interpolate.interp1d(l1_freqs, zeta)
+
+    if return_full:
+        return l1_freqs, zeta, zeta_fun
     return zeta_fun
+
+def stretched_pds(frequency, nom_l1_freqs, DeltaNu, 
+                  DPi1, coupling, eps_g, 
+                  numDPi1=100, DPi1_range=[0.99, 1.01], oversample=1):
+    # Compute frequency bin-width
+    bw = frequency[1]-frequency[0]
+    cond = (frequency > nom_l1_freqs.min()) & (frequency < nom_l1_freqs.max())
+    frequency = frequency[cond]
+    # Compute interpolated zeta across entire frequency range
+    l1_freqs, zz, zeta_fun = zeta_interp(frequency,
+                                         nom_l1_freqs, DeltaNu,
+                                         DPi1, coupling, eps_g,
+                                         numDPi1, DPi1_range,
+                                         return_full=True)
+    # Compute dtau
+    if oversample > 1:
+        new_freq = np.arange(frequency.min(), frequency.max(), bw/oversample)
+        #dtau = 1 / (zz*(pds.frequency.values)**2) * 1e6
+        dtau = 1 / (zeta_fun(new_freq)*(new_freq)**2) * 1e6
+    else:
+        new_freq = frequency
+        dtau = 1 / (zeta_fun(new_freq)*(new_freq)**2) * 1e6
+   
+    #dtau[np.isnan(dtau)] = 0
+    dtau = dtau[np.isfinite(dtau)]
+    # Compute tau
+    tau = -np.cumsum(dtau)*(bw/oversample)
+    tau -= np.min(tau)
+
+    #plt.plot(pds.frequency, dtau)
+    #plt.plot(pds.frequency, tau)
+    #plt.show()
+
+    # Place tau into seconds
+    #tau *= 1e6
+    # Compute tau values of l1 frequencies to shift tau
+    #l1_tau = np.interp(l1_freqs, pds.frequency.values, tau)
+    l1_tau = np.interp(l1_freqs, new_freq, tau)
+    l1_x = ((l1_tau + DPi1/2) % DPi1) - DPi1/2
+    #l1_x = l1_tau % DPi1
+    tau_shift = np.median(l1_x)
+    #st.write(tau_shift)
+    #l1_tau = l1_tau - tau_shift + DPi1
+    # Compute l1 zeta
+    #l1_zeta = np.interp(l1_freqs, pds.frequency.values, zz)
+
+    #tau = tau - tau_shift + DPi1
+
+    return new_freq, tau, zeta_fun
+
+def peaks_stretched_period(frequency, pds_frequency, tau):
+    assert len(tau) == len(pds_frequency)
+    return np.interp(frequency, pds_frequency, tau)
