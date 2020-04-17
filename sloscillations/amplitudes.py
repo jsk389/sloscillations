@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
-import .radial_mode_utils as radial_modes
 import numpy as np 
-import .scaling_relations as scalings
 
-from .frequencies import Frequencies
+from . import frequencies
+from . import radial_mode_utils as radial_modes
+from . import scaling_relations as scalings
+
 from scipy.interpolate import interp1d
 
-class Amplitudes(Frequencies):
+class Amplitudes(frequencies.Frequencies):
     """
     Class to calculate the amplitudes (and heights) of oscillation
     modes
@@ -67,17 +68,32 @@ class Amplitudes(Frequencies):
         """
         self.l1_nom_amps = self.a0(self.l1_nom_freqs) * np.sqrt(self.vis1)
     
+    def __call__(self, entries):
+        """
+        Run computation
+        """
+        # Update class attributes with new parameters
+        self.__dict__.update(entries)
 
+        # l=0 modes
+        if self.calc_l0:
+            self.generate_radial_modes()
+        # l=2 modes
+        if self.calc_l2:
+            self.generate_quadrupole_modes()
+        # l=1 nominal p-modes
+        if self.calc_nom_l1:
+            self.generate_nominal_dipole_modes()  
     
 if __name__=="__main__":
 
     frequency = np.arange(0.00787, 283., 0.00787)
 
     # Set up frequencies class
-    frequencies = Frequencies(frequency=frequency,
-                              numax=103.2, 
-                              delta_nu=9.57, 
-                              radial_order_range=[-5, 5])
+    frequencies = frequencies.Frequencies(frequency=frequency,
+                                          numax=103.2, 
+                                          delta_nu=9.57, 
+                                          radial_order_range=[-5, 5])
     # Eventually want this to read in from a configuration file
     params = {'calc_mixed': True,
               'calc_rot': True,

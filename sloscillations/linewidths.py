@@ -29,22 +29,41 @@ class Linewidths(Amplitudes):
 
     def generate_radial_modes(self):
         """
-        Generate radial mode amplitudes
+        Generate radial mode linewidths
         """
         self.l0_linewidths = utils.compute_linewidths(self.l0_freqs, self.numax)
 
     def generate_quadrupole_modes(self):
         """
-        Generate quadrupole mode amplitudes
+        Generate quadrupole mode linewidths
         """
         self.l2_linewidths = utils.compute_linewidths(self.l2_freqs, self.numax)
 
     def generate_nominal_dipole_modes(self):
         """
-        Generate nominal l=1 mode amplitudes
+        Generate nominal l=1 mode linewidths
         """
         self.l1_nom_linewidths = utils.compute_linewidths(self.l1_nom_freqs, self.numax)
-    
+
+    def generate_mixed_dipole_modes(self):
+        """
+        Generate mixed l=1 mode linewidths
+        """
+        if hasattr(self, 'l1_nom_linewidths'):
+            self.l1_mixed_linewidths =  self.l1_nom_linewidths * (1 - self.l1_zeta)
+        else:
+            self.l1_nom_linewidths = utils.compute_linewidths(self.l1_nom_freqs, self.numax)
+            self.l1_mixed_linewidths =  self.l1_nom_linewidths * (1 - self.l1_zeta)
+
+        # Also generate linewidths for rotationally split components if they exist
+        if hasattr(self, 'l1_mixed_freqs_p1') and (self.method='simple'):
+            self.l1_mixed_linewidths_p1 = self.l1_nom_linewidths * (1 - self.l1_zeta)
+        else:
+            sys.exit()
+        if hasattr(self, 'l1_mixed_freqs_n1') and (self.method='simple'):
+            self.l1_mixed_linewidths_n1 = self.l1_nom_linewidths * (1 - self.l1_zeta)
+        else:
+            sys.exit()
 
     
 if __name__=="__main__":

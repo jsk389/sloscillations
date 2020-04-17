@@ -5,6 +5,7 @@ import numpy as np
 from . import scaling_relations as scalings
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 class Frequencies(object):
 
@@ -51,12 +52,23 @@ class Frequencies(object):
         Generate l=0 mode frequencies
         """
         self.l0_freqs, self.l0_l = self.asymptotic_expression(l=0)
+        self.full_freqs = pd.DataFrame(data=np.c_[self.n.astype(int), 
+                                            self.l0_l.astype(int), 
+                                            np.nan*np.ones_like(self.l0_freqs),
+                                            self.l0_freqs], 
+                                       columns=['n', 'l', 'm', 'Frequency'])
         
     def generate_quadrupole_modes(self):
         """
         Generate l=2 mode frequencies
         """
         self.l2_freqs, self.l2_l = self.asymptotic_expression(l=2, d0l=self.d02)
+        tmp = pd.DataFrame(data=np.c_[self.n.astype(int), 
+                                      self.l2_l.astype(int), 
+                                      np.nan*np.ones_like(self.l2_freqs),
+                                      self.l2_freqs], 
+                           columns=['n', 'l', 'm', 'Frequency'])        
+        self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)
 
     def generate_nominal_dipole_modes(self):
         """
@@ -66,6 +78,12 @@ class Frequencies(object):
                                 self.n_max + self.radial_order_range[1]+2,
                                 1)
         self.l1_nom_freqs, self.l1_l = self.asymptotic_expression(l=1, d0l=np.append(self.d01, self.d01[:2]), n=n)
+        tmp = pd.DataFrame(data=np.c_[n.astype(int), 
+                                      [-1]*len(self.l1_nom_freqs), 
+                                      np.nan*np.ones_like(self.l1_nom_freqs),
+                                      self.l1_nom_freqs], 
+                           columns=['n', 'l', 'm', 'Frequency'])        
+        self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)
 
     def generate_mixed_dipole_modes(self, DPi1, coupling, eps_g, nom_p):
         """
@@ -78,12 +96,19 @@ class Frequencies(object):
                                                                            coupling,
                                                                            calc_zeta=True)  
         #if len(self.l1_nom_freqs) > 1:                                                      
-        #    cond = (self.l1_mixed_freqs > self.l1_nom_freqs.min()) & (self.l1_mixed_freqs < self.l1_nom_freqs.max())
+        cond = (self.l1_mixed_freqs > self.l1_nom_freqs.min()) & (self.l1_mixed_freqs < self.l1_nom_freqs.max())
         #else:
-        cond = (self.l1_mixed_freqs > self.l1_nom_freqs - self.delta_nu/2) & (self.l1_mixed_freqs < self.l1_nom_freqs + self.delta_nu/2)
+        #cond = (self.l1_mixed_freqs > self.l1_nom_freqs - self.delta_nu/2) & (self.l1_mixed_freqs < self.l1_nom_freqs + self.delta_nu/2)
         self.l1_mixed_freqs = self.l1_mixed_freqs[cond]
         self.l1_zeta = self.l1_zeta[cond]
         # Still need to assign radial  order to mixed modes!
+        tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                      [1]*len(self.l1_mixed_freqs), 
+                                      [0]*len(self.l1_mixed_freqs),
+                                      self.l1_mixed_freqs,
+                                      self.l1_zeta], 
+                           columns=['n', 'l', 'm', 'Frequency', 'zeta'])         
+        self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)
 
     def generate_rotational_splittings(self, split_core, DPi1, coupling, eps_g, split_env=0., l=1, method='simple'):
         """
@@ -95,6 +120,21 @@ class Frequencies(object):
                 splitting = (split_core/2 - split_env) * self.l1_zeta + split_env
                 self.l1_mixed_freqs_p1 = self.l1_mixed_freqs + splitting
                 self.l1_mixed_freqs_n1 = self.l1_mixed_freqs - splitting
+                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                              [1]*len(self.l1_mixed_freqs), 
+                                              [+1]*len(self.l1_mixed_freqs),
+                                              self.l1_mixed_freqs_p1,
+                                              self.l1_zeta], 
+                                columns=['n', 'l', 'm', 'Frequency', 'zeta'])         
+                self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)                
+                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                              [1]*len(self.l1_mixed_freqs), 
+                                              [-1]*len(self.l1_mixed_freqs),
+                                              self.l1_mixed_freqs_n1,
+                                              self.l1_zeta], 
+                                columns=['n', 'l', 'm', 'Frequency', 'zeta'])         
+                self.full_freqs = self.full_freqs.append(tmp, ignore_index=True) 
+
             elif method == 'Mosser':
                 # User method from Mosser et al. (2019)
                 # Stretch pds for given DPi1, coupling and eps_g values
@@ -132,29 +172,37 @@ class Frequencies(object):
         Plot an echelle of frequencies
         """
         if l0:
-            plt.plot(self.l0_freqs % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
-                    self.l0_freqs,
+            df_l0 = self.full_freqs.loc[self.full_freqs['l'] == 0, ]
+            plt.plot(df_l0.Frequency % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
+                    df_l0.Frequency,
                     color='r', marker='D', label='$\ell=0$', linestyle='None', zorder=1, markersize=5)
         if l2:
-            plt.plot(self.l2_freqs % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
-                    self.l2_freqs, 
+            df_l2 = self.full_freqs.loc[self.full_freqs['l'] == 2, ]
+            plt.plot(df_l2.Frequency % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
+                    df_l2.Frequency, 
                     color='g', marker='s', label='$\ell=2$', linestyle='None', zorder=1, markersize=5)
         if l1:
-            plt.plot(self.l1_nom_freqs % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
-                    self.l1_nom_freqs, 
+            df_l1 = self.full_freqs.loc[self.full_freqs['l'] == -1, ]
+            plt.plot(df_l1.Frequency % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
+                    df_l1.Frequency, 
                     color='b', marker='o', label='Nominal $\ell=1$', linestyle='None', zorder=1, markersize=5)
         if mixed:
-            for i in range(len(self.l1_mixed_freqs)):
+            df_l1_m0 = self.full_freqs.loc[(self.full_freqs['l'] == 1) & (self.full_freqs['m'] == 0), ]
+            if rotation:
+                df_l1_mp1 = self.full_freqs.loc[(self.full_freqs['l'] == 1) & (self.full_freqs['m'] == +1), ]
+                df_l1_mn1 = self.full_freqs.loc[(self.full_freqs['l'] == 1) & (self.full_freqs['m'] == -1), ]
+
+            for i in range(len(df_l1_m0.Frequency)):
                 color = next(plt.gca()._get_lines.prop_cycler)['color']
-                plt.plot(self.l1_mixed_freqs[i] % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
-                        self.l1_mixed_freqs[i], 
+                plt.plot(df_l1_m0.Frequency.iloc[i] % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
+                        df_l1_m0.Frequency.iloc[i], 
                         color=color, marker='v', label='Mixed $\ell=1$, $m=0$', linestyle='None', zorder=0, markersize=3)
                 if rotation:
-                    plt.plot(self.l1_mixed_freqs_p1[i] % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
-                            self.l1_mixed_freqs_p1[i],
+                    plt.plot(df_l1_mp1.Frequency.iloc[i] % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
+                            df_l1_mp1.Frequency.iloc[i],
                             color=color, marker='<', label='Mixed $\ell=1$, $m=+1$', linestyle='None', zorder=0, markersize=3)
-                    plt.plot(self.l1_mixed_freqs_n1[i] % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
-                            self.l1_mixed_freqs_n1[i], 
+                    plt.plot(df_l1_mn1.Frequency.iloc[i] % self.delta_nu - self.epsilon_p + 0.1*self.delta_nu, 
+                            df_l1_mn1.Frequency.iloc[i], 
                             color=color, marker='>', label='Mixed $\ell=1$, $m=-1$', linestyle='None', zorder=0, markersize=3)
         plt.xlim(0, self.delta_nu)
         plt.xlabel(r'$\nu$ mod $\Delta\nu$ ($\mu$Hz)', fontsize=18)

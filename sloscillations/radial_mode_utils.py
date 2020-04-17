@@ -2,7 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np 
-import scaling_relations as scalings
+from . import scaling_relations as scalings
 
 from scipy.interpolate import interp1d
 
