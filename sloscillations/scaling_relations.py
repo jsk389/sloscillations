@@ -108,8 +108,8 @@ def gamma_scaling(numax, deterministic=True):
     has been modified by Lund et al. (2016) and using values from
     Lund et al. (2016)
     """
-    alpha = 2.95 * (numax/3090) + 0.39
-    gamma_a = 3.08 * (numax/3090) + 3.32
+    alpha = 2.95 * (numax/3090) - 0.39
+    gamma_a = 3.32 * (numax/3090) + 3.08
     gamma_dip = -0.47 * (numax/3090) + 0.62
     W_dip = 4637 * (numax / 3090) - 141
     nu_dip = 2984 * (numax / 3090) + 60

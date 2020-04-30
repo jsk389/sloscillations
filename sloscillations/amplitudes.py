@@ -67,6 +67,17 @@ class Amplitudes(frequencies.Frequencies):
         Generate nominal l=1 mode amplitudes
         """
         self.l1_nom_amps = self.a0(self.l1_nom_freqs) * np.sqrt(self.vis1)
+
+    def generate_mixed_dipole_modes(self):
+        """
+        Generate mixed l=1 mode amplitudes
+        """
+        self.l1_mixed_amps = []
+        radial_order = np.unique(self.l1_np)
+        for i in range(len(radial_order)):
+            cond = (self.l1_np == radial_order[i])
+            self.l1_mixed_amps = np.append(self.l1_mixed_amps,
+                                           self.l1_nom_amps[i] * (1 - self.l1_zeta[cond])**1/2)
     
     def __call__(self, entries):
         """
@@ -84,6 +95,8 @@ class Amplitudes(frequencies.Frequencies):
         # l=1 nominal p-modes
         if self.calc_nom_l1:
             self.generate_nominal_dipole_modes()  
+        if self.calc_mixed:
+            self.generate_mixed_dipole_modes()
     
 if __name__=="__main__":
 

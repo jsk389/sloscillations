@@ -2,61 +2,417 @@
 
 import itertools
 import numpy as np 
+import matplotlib.pyplot as plt
 
 from scipy import interpolate
 from scipy.integrate import quad
-from scipy.optimize import brentq
+from scipy.optimize import brentq, ridder
 
-def all_mixed_l1_freqs(delta_nu, nu_p, DPi1, eps_g, coupling, calc_zeta=True):
+
+def all_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, return_order=True, calc_zeta=True, method='Mosser2018_update'):
 
     l1_freqs = []
+    l1_g_freqs = []
     zeta = []
+    order = []
+    N_g = []
+
     for i in range(len(nu_p)):
-        tmp = find_mixed_l1_freqs(delta_nu, nu_p[i], 
-                                DPi1, eps_g, coupling)
+
+        if nu_p[i] > nu_zero[-1]:
+            radial = np.array([nu_zero[-1], nu_zero[-1] + delta_nu])
+        else:
+            radial = np.array([nu_zero[i], nu_zero[i+1]])
+            
+
+        tmp, tmp_g, tmp_ng = find_mixed_l1_freqs(delta_nu, radial, nu_p[i], 
+                                         DPi1, eps_g, coupling, method=method)
         if calc_zeta == True:
             tmp_zeta = calculate_zeta(tmp, nu_p[i], delta_nu, DPi1, coupling, eps_g)
             zeta.append(tmp_zeta)
+        order.append([i]*len(tmp))
         l1_freqs.append(tmp)
+        l1_g_freqs.append(tmp_g)
+        N_g.append(tmp_ng)
 
-    if calc_zeta:
-        return np.array(list(itertools.chain(*l1_freqs))), np.array(list(itertools.chain(*zeta)))
+    if calc_zeta and return_order:
+        return np.array(list(itertools.chain(*l1_freqs))), \
+               np.array(list(itertools.chain(*zeta))), \
+               np.array(list(itertools.chain(*order))), \
+               np.array(list(itertools.chain(*l1_g_freqs))), \
+               np.array(list(itertools.chain(*N_g)))
+    elif calc_zeta:
+        return np.array(list(itertools.chain(*l1_freqs))), \
+               np.array(list(itertools.chain(*zeta)))
     else:
         return np.array(list(itertools.chain(*l1_freqs)))
 
-def find_mixed_l1_freqs(delta_nu, nu_p, DPi1, eps_g, coupling):
+def find_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, method='Mosser2018_update'):
     """
     Find all mixed modes in a given radial order
     """
 
-    nmin = np.ceil(1 / (DPi1*1e-6 * (nu_p + (delta_nu/2))) - (1/2) - eps_g)
-    nmax = np.ceil(1 / (DPi1*1e-6 * (nu_p - (delta_nu/2))) - (1/2) - eps_g)
-    nmax += 2
+    #nmin = np.floor(1 / (DPi1*1e-6 * (nu_p + (delta_nu/2))) - (1/2) - eps_g)
+    #nmax = np.floor(1 / (DPi1*1e-6 * (nu_p - (delta_nu/2))) - (1/2) - eps_g)
+    if ('Mosser2015' in method) or (method == 'Mosser2018') or (method == 'oldMosser2018'):
+        nmin = np.floor(1 / (DPi1*1e-6 * nu_zero[1]) - eps_g)
+        nmax = np.floor(1 / (DPi1*1e-6 * nu_zero[0]) - eps_g)
+    else:
+        nmin = np.floor(1 / (DPi1*1e-6 * nu_zero[1]) - (1/2) - eps_g)
+        nmax = np.floor(1 / (DPi1*1e-6 * nu_zero[0]) - (1/2) - eps_g)
 
-    frequencies = []
-    for i in np.arange(nmin, nmax, 1):
-        tmp = find_mixed_l1_freq(delta_nu, nu_p, DPi1, eps_g, coupling, i)
-        frequencies = np.append(frequencies, tmp)
+    N_modes = (delta_nu * 1e-6) / (DPi1 * (nu_p*1e-6)**2)
+    #print("NUMBER OF MIXED MODES: ", N_modes+1)
+    
+    
+    # Changed to this to be exactly the same as Mosser 2018
+    #nmin = np.floor(1 / (DPi1*1e-6 * (nu_p + (delta_nu/2))) - eps_g)
+    #nmax = np.floor(1 / (DPi1*1e-6 * (nu_p - (delta_nu/2))) - eps_g)
 
-    return np.sort(frequencies[np.isfinite(frequencies)])
+    # For some reason have to do this to ensure that find all solutions!
+    #nmax += 2
+    #nmin += 1
+    N = np.arange(nmin, nmax + 2, 1)
+    #print("RADS: ", nmin, nmax, N.min(), N.max())
 
-def find_mixed_l1_freq(delta_nu, pone, DPi1, eps_g, coupling, N):
+    if 'old' in method:
+        frequencies = []
+        g_mode_freqs = []
+        N_g = []
+        for i in np.arange(nmin, nmax, 1):
+            tmp, tmp_g, tmp_ng = find_mixed_l1_freq(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, i, method=method[3:])
+            frequencies = np.append(frequencies, tmp)
+            g_mode_freqs = np.append(g_mode_freqs, tmp_g)
+            N_g = np.append(N_g, tmp_ng)
+        return np.sort(frequencies[np.isfinite(frequencies)]), np.sort(g_mode_freqs[np.isfinite(g_mode_freqs)]), np.sort(N_g[np.isfinite(N_g)])
+    elif 'Hekker2018' in method:
+        N = np.arange(nmin, nmax, 1)
+        frequencies, g_mode_freqs, N_g = find_mixed_l1_freqs_hekker(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, N)
+    else:
+        frequencies, g_mode_freqs, N_g = find_mixed_l1_freq_(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, N, method=method)
+    #sys.exit()
+    #for i in np.arange(nmin, nmax, 1):
+    #    tmp, tmp_g, tmp_ng = find_mixed_l1_freq(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, i, method=method)
+    #    frequencies = np.append(frequencies, tmp)
+    #    g_mode_freqs = np.append(g_mode_freqs, tmp_g)
+    #    N_g = np.append(N_g, tmp_ng)
+    #print("NUMBER OF MIXED MODES FOUND: ", len(frequencies[np.isfinite(frequencies)]))
+    return np.sort(frequencies[np.isfinite(frequencies)]), np.sort(g_mode_freqs[np.isfinite(g_mode_freqs)]), np.sort(N_g[np.isfinite(N_g)])
+
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
+
+def find_mixed_l1_freqs_hekker(delta_nu, pzero, pone, DPi1, eps_g, coupling, N):
+
+    f = np.linspace(pzero[0], pzero[1], 10000)
+
+    # Compute theta_p
+    theta_p = np.pi/(pzero[1]-pzero[0]) * (f - pone)
+
+    #theta_p[theta_p > np.pi/2] = np.pi - theta_p[theta_p > np.pi/2]
+    #theta_p[theta_p < -np.pi/2] = -np.pi - theta_p[theta_p < -np.pi/2]
+
+
+    # Compute phi
+    phi = np.arctan2(coupling, np.tan(theta_p))
+    plt.plot(f, (theta_p), '.')
+    plt.show()
+    #f = f[cond]
+
+    #plt.plot(f, phi)
+    #plt.show()
+
+    # Compute psi
+    psi = 1 / (DPi1*f*1e-6) + phi/np.pi - eps_g - 1/2
+    # Compute integer radial orders
+    k = np.arange(np.floor(psi.max()), np.floor(psi.min()), -1)
+    # Find nearest integer psi value
+    print(psi.min(), np.ceil(psi.min()), psi.max(), k.min(), k.max())
+    vec_nearest = lambda x: find_nearest(psi, x)
+    index = np.vectorize(vec_nearest)(k)
+    ng = -psi[index]
+
+    # Check ng is close enough to given integer
+    mod = ng % 1
+    mod[mod > 0.5] = 1 - mod[mod > 0.5]
+    cond = mod < 1e-2
+
+    #ng = np.floor(ng[cond])
+    ng = np.round(ng[cond])
+    #print(ng)
+
+
+    # Compute period of mixed modes
+    mixed_period = (-ng + eps_g + 1/2 - phi[index][cond]/np.pi) * DPi1
+
+    plt.plot(f, psi, '.')
+    for i in (1e6/mixed_period):
+        plt.axvline(i, color='r', linestyle='--', alpha=0.5)
+    plt.axvline(pzero[0], color='r', alpha=0.5)
+    plt.axvline(pzero[1], color='r', alpha=0.5)
+    plt.show()
+
+    # Compute mixed mode frequency
+    mixed_nu = 1e6/mixed_period
+    # Compute underlying g-mode periods
+    g_period = (-ng + eps_g + 1/2) * DPi1
+    #print(mixed_nu, 1e6/g_period)
+    
+    return mixed_nu, 1e6/g_period, ng
+
+def find_mixed_l1_freq_(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method='Mosser2018_update'):
     """
     Find individual mixed mode
     """
 
     def opt_func(nu):
-        theta_p = (np.pi / delta_nu) * (nu - pone)
-        theta_g = np.pi * (1 / (DPi1*1e-6*nu) - eps_g)
-        return theta_p - np.arctan(coupling * np.tan(theta_g))
-    
-    lower_bound = 1 / (DPi1*1e-6 * (N + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
-    upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+        theta_p = (np.pi / (pzero[1]-pzero[0])) * (nu - pone)
+        #theta_g = np.pi * (1 / (DPi1*1e-6*nu) - eps_g)
+        if method == 'Mosser2015':
+            theta_g = np.pi * (1 / (DPi1*1e-6*nu) - eps_g)
+        elif method == 'Mosser2018':
+            theta_g = np.pi/DPi1 * 1e6 * (1/nu - 1/nu_g)
+        elif method == 'Mosser2018_update':
+            theta_g = np.pi/DPi1 * 1e6 * (1/nu - 1/nu_g) + np.pi/2
+        y = np.tan(theta_p) - coupling * np.tan(theta_g)
+        #y = theta_p - np.arctan2(coupling, 1/np.tan(theta_g))
+        return y# - np.tan(theta_p)# - val + np.finfo(float).eps * 1e10
 
-    try:
-        return brentq(opt_func, lower_bound, upper_bound)
+    def opt_funcM(nu, nu_g):
+        theta_p = (np.pi / (pzero[1]-pzero[0])) * (nu - pone)
+        if method == 'Mosser2018':
+            theta_g = np.pi/DPi1 * 1e6 * (1/nu - 1/nu_g)
+        elif method == 'Mosser2018_update':
+            theta_g = np.pi/DPi1 * 1e6 * (1/nu - 1/nu_g) + np.pi/2
+        y = np.tan(theta_p) - coupling * np.tan(theta_g)
+        #y = theta_p - np.arctan2(coupling, 1/np.tan(theta_g))
+        return y# - np.tan(theta_p)# - val + np.finfo(float).eps * 1e10
+
+    if method == 'Mosser2015':
+        nu_g = 1 / ((N + eps_g)*DPi1*1e-6)
+        lower_bound = 1 / (DPi1*1e-6 * (N.max()     + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
+        upper_bound = 1 / (DPi1*1e-6 * (N.min() - 1 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+    elif method == 'Mosser2018':
+        nu_g = 1 / (DPi1*1e-6 * (N + eps_g))
+        lower_bound = 1 / (DPi1*1e-6 * (N     + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
+        upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+    elif method == 'Mosser2018_update':
+        nu_g = 1 / (DPi1*1e-6 * (N + 1/2 + eps_g))
+        # Go +/- 1/2 * DPi1 away from g-mode period
+        lower_bound = 1 / (DPi1*1e-6 * (N     + 1/2 + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
+        upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+
+    if method != 'Mosser2015':
+        #print(lower_bound, upper_bound, nu_g)
+        f = np.linspace(pzero[0], pzero[1], 10000)#[1:-1]
+        dnu = np.diff(pzero)
+        solns = []
+        for i in range(len(nu_g)):
+            if (upper_bound[i] > pzero[1]):
+                #print("BEFORE UPP: ", upper_bound)
+                upper_bound[i] = pzero[1]# + 0.05*dnu# - np.finfo(float).eps*1e4
+                #print("AFTER UPP: ", upper_bound)
+            elif (lower_bound[i] < pzero[0]):
+                #print("BEFORE LOW: ", lower_bound)
+                lower_bound[i] = pzero[0]# - 0.05*dnu# + np.finfo(float).eps*1e4
+                #print("AFTER LOW: ", lower_bound)
+            #print(upper_bound[i], lower_bound[i], pzero)
+            if (upper_bound[i] < lower_bound[i]) or (lower_bound[i] > upper_bound[i]):
+                #print("Bad boundary conditions")
+                pass
+            else:
+                ff = np.linspace(lower_bound[i], upper_bound[i], 1000)
+                y = opt_funcM(ff, nu_g[i])
+        
+                idx = np.where(np.diff(np.sign(y)) > 0)[0]
+                if len(idx) == 0:
+                    soln = np.array([])
+                else:
+                    soln = ff[idx]
+                
+                #plt.plot(ff, y, '.')
+                #plt.axvline(nu_g[i], color='C1')
+                #for i in soln:
+                #    plt.axvline(i, color='b', linestyle='--')
+                #plt.ylim(-10, 10)
+                solns = np.append(solns, soln)
+        #print(solns)
+        #print(len(solns))
+        """
+        plt.xlim(pzero[0]-0.1, pzero[1]+0.1)
+        plt.xlabel(r'Frequency ($\mu$Hz)', fontsize=18)
+        plt.ylabel(r'$\tan\theta_{p} - q\tan\theta_{g}$', fontsize=18)
+        plt.axvline(pzero[1], linestyle=':', color='r', label=r'$\nu_{n+1,\ell=0}$')
+        plt.axvline(pone, linestyle='--', color='r', label=r'$\nu_{p}$')
+        plt.axvline(pzero[0], color='r', label=r'$\nu_{n,\ell=0}$')
+        plt.legend(loc='best')
+        plt.show()
+        """
+        theta_p = (np.pi / (pzero[1]-pzero[0])) * (solns - pone)
+        # Approximate pure g-mode frequencies and radial orders
+        g_period = 1/(solns*1e-6) - DPi1/np.pi * np.arctan2(np.tan(theta_p), coupling) 
+        if method == 'Mosser2018':
+            n_g = np.floor(g_period / DPi1 - eps_g) 
+        else:
+            n_g = np.floor(g_period / DPi1 - eps_g - 1/2)
+        return solns, 1e6/g_period, n_g
+    
+    if method == 'Mosser2015':
+
+        upper_bound = upper_bound.max()
+        lower_bound = lower_bound.min()
+        if (upper_bound > pzero[1]):
+            #print("BEFORE UPP: ", upper_bound)
+            upper_bound = pzero[1]# - np.finfo(float).eps*1e4
+            #print("AFTER UPP: ", upper_bound)
+        elif (lower_bound < pzero[0]):
+            #print("BEFORE LOW: ", lower_bound)
+            lower_bound = pzero[0]# + np.finfo(float).eps*1e4
+            #print("AFTER LOW: ", lower_bound)
+
+        low = opt_func(lower_bound)
+        upp = opt_func(upper_bound)
+
+        if upper_bound < lower_bound:
+            print("OH DEAR")
+            return np.nan, np.nan, np.nan
+        
+        f = np.linspace(pzero[0], pzero[1], 10000)
+        y = opt_func(f)
+        
+        idx = np.where(np.diff(np.sign(opt_func(f))) > 0)[0]
+        if len(idx) == 0:
+            soln = np.array([])
+        else:
+            soln = (f[idx] + f[idx+1])/2
+
+        #print("NO of g-modes: ", len(soln), len(nu_g), len(N))
+        """
+        if len(soln) > 1:
+            theta_p = (np.pi / (pzero[1]-pzero[0])) * (f - pone)
+            plt.scatter(f, opt_func(f), s=3)
+            plt.plot(f, np.tan(theta_p), color='k', label=r'$\tan\theta_{p}$')
+            plt.axvline(lower_bound, linestyle='--', color='k')
+            plt.axvline(upper_bound, linestyle='--', color='k')
+            for i in nu_g:
+                if i == nu_g[-1]:
+                    plt.axvline(i, color='C1', label=r'$\nu_{g}$')
+                else:
+                    plt.axvline(i, color='C1')
+            plt.axvline(pzero[1], linestyle=':', color='r', label=r'$\nu_{n,\ell=0}$')
+            plt.axvline(pone, linestyle='--', color='r', label=r'$\nu_{p}$')
+            plt.axvline(pzero[0], color='r', label=r'$\nu_{n+1,\ell=0}$')
+            plt.xlim(pzero[0]-0.1, pzero[1]+0.1)
+            plt.title(soln)
+            for i in soln:
+                if i == soln[-1]:
+                    plt.axvline(i, linestyle='--', color='b', label=r'$\nu_{\mathrm{mixed}}$')
+                else:
+                    plt.axvline(i, linestyle='--', color='b')
+            plt.ylim(-10, 10)
+            plt.xlabel(r'Frequency ($\mu$Hz)', fontsize=18)
+            plt.ylabel(r'$\tan\theta_{p} - q\tan\theta_{g}$', fontsize=18)
+            plt.legend(loc='best')
+            plt.show()
+        """
+        theta_p = (np.pi / (pzero[1]-pzero[0])) * (soln - pone)
+        # Approximate pure g-mode frequencies and radial orders
+        g_period = 1/(soln*1e-6) - DPi1/np.pi * np.arctan2(np.tan(theta_p), coupling) 
+
+        n_g = (np.floor(g_period / DPi1) - eps_g) 
+       
+        if len(soln) < 1:
+            return np.nan, np.nan, np.nan
+        else:
+            return soln, 1e6/g_period, n_g
+
+def find_mixed_l1_freq(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method='Mosser2018_update'):
+    """
+    Find individual mixed mode
+    """
+
+    def opt_func(nu, val=0):
+        theta_p = (np.pi / delta_nu) * (nu - pone)
+        #theta_g = np.pi * (1 / (DPi1*1e-6*nu) - eps_g)
+        if method == 'Mosser2015':
+            theta_g = np.pi * (1 / (DPi1*1e-6*nu) - eps_g)
+        elif method == 'Mosser2018':
+            theta_g = np.pi/DPi1 * 1e6 * (1/nu - 1/nu_g)
+        elif method == 'Mosser2018_update':
+            theta_g = np.pi/DPi1 * 1e6 * (1/nu - 1/nu_g) + np.pi/2
+        y = np.tan(theta_p) - coupling * np.tan(theta_g)
+        #y = theta_p - np.arctan2(coupling, 1/np.tan(theta_g))
+        return y# - val + np.finfo(float).eps * 1e10
+
+
+    if method == 'Mosser2015':
+        nu_g = 1 / ((N + eps_g)*DPi1*1e-6)
+        lower_bound = 1 / (DPi1*1e-6 * (N     + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
+        upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+    elif method == 'Mosser2018':
+        nu_g = 1 / (DPi1*1e-6 * (N + eps_g))
+        lower_bound = 1 / (DPi1*1e-6 * (N     + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
+        upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+    elif method == 'Mosser2018_update':
+        nu_g = 1 / (DPi1*1e-6 * (N + 1/2 + eps_g))
+        # Go +/- 1/2 * DPi1 away from g-mode period
+        lower_bound = 1 / (DPi1*1e-6 * (N     + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
+        upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+    
+    if (upper_bound > pzero[1]):
+        #print("BEFORE UPP: ", upper_bound)
+        upper_bound = pzero[1]- np.finfo(float).eps*1e4
+        #print("AFTER UPP: ", upper_bound)
+    elif (lower_bound < pzero[0]):
+        #print("BEFORE LOW: ", lower_bound)
+        lower_bound = pzero[0] + np.finfo(float).eps*1e4
+        #print("AFTER LOW: ", lower_bound)
+
+    #low = opt_func(lower_bound)
+    #upp = opt_func(upper_bound)
+
+    if upper_bound < lower_bound:
+        return np.nan, np.nan, np.nan
+
+        
+    #print(soln)
+    #if len(soln) > 1
+    """
+    try: 
+        brentq(opt_func, lower_bound, upper_bound)
     except:
-        return np.nan
+        f = np.linspace(lower_bound, upper_bound, 1000)
+        plt.plot(f, opt_func(f, val=0), '.')
+        plt.axvline(lower_bound, linestyle='--', color='k')
+        plt.axvline(upper_bound, linestyle='--', color='k')
+        plt.axvline(nu_g, color='C1')
+        plt.axvline(pzero[1], linestyle=':', color='r')
+        plt.axvline(pone, linestyle='--', color='r')
+        plt.axvline(pzero[0], color='r')
+        plt.xlim(lower_bound -0.1, upper_bound + 0.1)
+        #plt.xlim(pzero[0], pzero[1])
+        plt.ylabel(r'$\tan\theta_{p}-q\tan\theta_{g}$', fontsize=18)
+        plt.xlabel(r'Frequency ($\mu$Hz)', fontsize=18)
+        #plt.axvline(brentq(opt_func, lower_bound, upper_bound), linestyle='--', color='b')
+        #plt.title(soln)
+        #for i in soln:
+        #    plt.axvline(i, linestyle='--', color='b')
+        plt.ylim(-10, 10)
+        plt.show()
+    """
+    #print(opt_func(soln))
+    #    soln = soln[abs(opt_func(soln)).argmin()]
+   # res = root
+
+    #print(lower_bound, pone, pone+delta_nu/2, upper_bound, nu_g)
+    try:
+        soln = brentq(opt_func, lower_bound, upper_bound)
+        return soln, nu_g, N
+    except:
+        return np.nan, np.nan, np.nan
+
 
 def l1_rot_from_zeta(nu_0, nu_m, drot, zeta_fun):
     """
@@ -112,14 +468,21 @@ def l1_theoretical_rot_M(l1_m0_freqs, drot, zeta_fun, max_iters=50, tol=1e-4):
         #sys.exit()
     return l_mp1_freqs, l_mn1_freqs, int_zeta_p, int_zeta_n
 
-def calculate_zeta(freq, nu_p, DeltaNu, DPi1, coupling, eps_g):
+def calculate_zeta_(freq, nu_p, DeltaNu, DPi1, coupling, eps_g):
     # Deheuvels et al. (2015) <http://dx.doi.org/10.1051/0004-6361/201526449>
     a1 = np.cos(np.pi * ((1 / (freq * DPi1*1e-6)) - eps_g))**2
     a2 = np.cos(np.pi * ((freq - nu_p) / DeltaNu))**2
     a3 = (freq**2 * DPi1*1e-6) / (coupling * DeltaNu)
     b = 1 + a1 * a3 / a2
     return 1/b
-    
+
+def calculate_zeta(freq, nu_p, DeltaNu, DPi1, coupling, eps_g):
+    theta_p = np.pi * (freq - nu_p) / DeltaNu
+    N = (DeltaNu*1e-6) / ((nu_p*1e-6)**2 * DPi1)
+    denominator = coupling**2*np.cos(theta_p)**2 + np.sin(theta_p)**2
+    inv_zeta = 1 + coupling/N * 1/denominator
+    return 1 / inv_zeta 
+
 def zeta_interp(freq, nu_p, delta_nu, 
                 DPi1, coupling, eps_g,
                 numDPi1=100, DPi1_range=[0.99, 1.01], return_full=False):
@@ -130,7 +493,7 @@ def zeta_interp(freq, nu_p, delta_nu,
 
     for i in range(len(DPi1_vals)):
         #print(DPi1_vals[i])
-        tmp_l1_freqs, tmp_zeta = all_mixed_l1_freqs(delta_nu, nu_p, DPi1_vals[i], eps_g, coupling, calc_zeta=True)
+        tmp_l1_freqs, tmp_zeta, _ = all_mixed_l1_freqs(delta_nu, nu_p, DPi1_vals[i], eps_g, coupling, calc_zeta=True)
 
         l1_freqs = np.append(l1_freqs, tmp_l1_freqs)
         zeta = np.append(zeta, tmp_zeta)

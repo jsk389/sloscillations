@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
-import radial_mode_utils as radial_modes
 import numpy as np 
-import scaling_relations as scalings
-import utils
 
-from amplitudes import Amplitudes
+from . import utils
+from . import amplitudes
+
 from scipy.interpolate import interp1d
 
-class Linewidths(Amplitudes):
+class Linewidths(amplitudes.Amplitudes):
     """
     Class to calculate the amplitudes (and heights) of oscillation
     modes
@@ -49,22 +48,56 @@ class Linewidths(Amplitudes):
         """
         Generate mixed l=1 mode linewidths
         """
-        if hasattr(self, 'l1_nom_linewidths'):
-            self.l1_mixed_linewidths =  self.l1_nom_linewidths * (1 - self.l1_zeta)
-        else:
+        if not hasattr(self, 'l1_nom_linewidths'):
             self.l1_nom_linewidths = utils.compute_linewidths(self.l1_nom_freqs, self.numax)
-            self.l1_mixed_linewidths =  self.l1_nom_linewidths * (1 - self.l1_zeta)
 
-        # Also generate linewidths for rotationally split components if they exist
-        if hasattr(self, 'l1_mixed_freqs_p1') and (self.method='simple'):
-            self.l1_mixed_linewidths_p1 = self.l1_nom_linewidths * (1 - self.l1_zeta)
-        else:
-            sys.exit()
-        if hasattr(self, 'l1_mixed_freqs_n1') and (self.method='simple'):
-            self.l1_mixed_linewidths_n1 = self.l1_nom_linewidths * (1 - self.l1_zeta)
-        else:
-            sys.exit()
+        # m=0 components
+        self.l1_mixed_linewidths = []
+        radial_order = np.unique(self.l1_np)
+        for i in range(len(radial_order)):
+            cond = (self.l1_np == radial_order[i])
+            self.l1_mixed_linewidths = np.append(self.l1_mixed_linewidths,
+                                        self.l1_nom_linewidths[i] * (1 - self.l1_zeta[cond]))
 
+        if self.calc_rot:
+            # Also generate linewidths for rotationally split components if they exist
+            if hasattr(self, 'l1_mixed_freqs_p1') and (self.method=='simple'):
+                self.l1_mixed_linewidths_p1 = []
+                radial_order = np.unique(self.l1_np)
+                for i in range(len(radial_order)):
+                    cond = (self.l1_np == radial_order[i])
+                    self.l1_mixed_linewidths_p1 = np.append(self.l1_mixed_linewidths_p1,
+                                                self.l1_nom_linewidths[i] * (1 - self.l1_zeta[cond]))
+            elif hasattr(self, 'l1_mixed_freqs_p1') and (self.method=='Mosser'):
+                sys.exit()
+            if hasattr(self, 'l1_mixed_freqs_n1') and (self.method=='simple'):
+                self.l1_mixed_linewidths_n1 = []
+                radial_order = np.unique(self.l1_np)
+                for i in range(len(radial_order)):
+                    cond = (self.l1_np == radial_order[i])
+                    self.l1_mixed_linewidths_n1 = np.append(self.l1_mixed_linewidths_n1,
+                                                self.l1_nom_linewidths[i] * (1 - self.l1_zeta[cond]))
+            else:
+                sys.exit()
+
+    def __call__(self, entries):
+        """
+        Run computation
+        """
+        # Update class attributes with new parameters
+        self.__dict__.update(entries)
+
+        # l=0 modes
+        if self.calc_l0:
+            self.generate_radial_modes()
+        # l=2 modes
+        if self.calc_l2:
+            self.generate_quadrupole_modes()
+        # l=1 nominal p-modes
+        if self.calc_nom_l1:
+            self.generate_nominal_dipole_modes()  
+        if self.calc_mixed:
+            self.generate_mixed_dipole_modes()
     
 if __name__=="__main__":
 

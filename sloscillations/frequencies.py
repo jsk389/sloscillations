@@ -28,8 +28,11 @@ class Frequencies(object):
                            1)
         
         # Small separations
-        self.d02 = scalings.d02_scaling(self.n, self.delta_nu)
+        self.d02 = scalings.d02_scaling(self.n-1, self.delta_nu)
         self.d01 = scalings.d01_scaling(self.n)
+
+        # Dipole mixed mode frequency calculation method
+        #self.calc_method = 'Mosser2018_update'
 
     def asymptotic_expression(self, l, d0l=0, n=None):
         """
@@ -62,77 +65,96 @@ class Frequencies(object):
         """
         Generate l=2 mode frequencies
         """
-        self.l2_freqs, self.l2_l = self.asymptotic_expression(l=2, d0l=self.d02)
-        tmp = pd.DataFrame(data=np.c_[self.n.astype(int), 
+        self.l2_freqs, self.l2_l = self.asymptotic_expression(l=2, d0l=self.d02, n=self.n-1)
+        tmp = pd.DataFrame(data=np.c_[(self.n - 1).astype(int), 
                                       self.l2_l.astype(int), 
                                       np.nan*np.ones_like(self.l2_freqs),
                                       self.l2_freqs], 
-                           columns=['n', 'l', 'm', 'Frequency'])        
+                           columns=['n', 'l', 'm', 'Frequency'])         
         self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)
 
     def generate_nominal_dipole_modes(self):
         """
         Generate l=1 nominal p-mode frequencies
         """
-        n = np.arange(self.n_max + self.radial_order_range[0] - 1,
-                                self.n_max + self.radial_order_range[1]+2,
+        n = np.arange(self.n_max + self.radial_order_range[0],
+                                self.n_max + self.radial_order_range[1]+1,
                                 1)
-        self.l1_nom_freqs, self.l1_l = self.asymptotic_expression(l=1, d0l=np.append(self.d01, self.d01[:2]), n=n)
+
+        self.l1_nom_freqs, self.l1_l = self.asymptotic_expression(l=1, d0l=self.d01, n=n)
         tmp = pd.DataFrame(data=np.c_[n.astype(int), 
                                       [-1]*len(self.l1_nom_freqs), 
                                       np.nan*np.ones_like(self.l1_nom_freqs),
                                       self.l1_nom_freqs], 
-                           columns=['n', 'l', 'm', 'Frequency'])        
+                           columns=['n', 'l', 'm', 'Frequency'])         
         self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)
 
     def generate_mixed_dipole_modes(self, DPi1, coupling, eps_g, nom_p):
         """
         Generate l=1 mixed mode frequencies
         """
-        self.l1_mixed_freqs, self.l1_zeta = mixed_modes.all_mixed_l1_freqs(self.delta_nu,
-                                                                           nom_p,
-                                                                           DPi1,
-                                                                           eps_g,
-                                                                           coupling,
-                                                                           calc_zeta=True)  
-        #if len(self.l1_nom_freqs) > 1:                                                      
-        cond = (self.l1_mixed_freqs > self.l1_nom_freqs.min()) & (self.l1_mixed_freqs < self.l1_nom_freqs.max())
+        self.l1_mixed_freqs, self.l1_zeta, self.l1_np, self.l1_g_freqs, self.l1_ng = mixed_modes.all_mixed_l1_freqs(self.delta_nu,
+                                                                                       self.l0_freqs,
+                                                                                       nom_p,
+                                                                                       DPi1,
+                                                                                       eps_g,
+                                                                                       coupling,
+                                                                                       return_order=True,
+                                                                                       calc_zeta=True,
+                                                                                       method=self.calc_method)  
+        #plt.plot(self.l1_mixed_freqs, self.l1_zeta)
+        #plt.show()
+        #if len(self.l1_nom_freqs) > 1:                           
+                 
+        cond = (self.l1_mixed_freqs > self.l0_freqs.min()) & (self.l1_mixed_freqs < self.l0_freqs.max())
         #else:
         #cond = (self.l1_mixed_freqs > self.l1_nom_freqs - self.delta_nu/2) & (self.l1_mixed_freqs < self.l1_nom_freqs + self.delta_nu/2)
         self.l1_mixed_freqs = self.l1_mixed_freqs[cond]
+        self.l1_g_freqs = self.l1_g_freqs[cond]
         self.l1_zeta = self.l1_zeta[cond]
+        self.l1_ng = self.l1_ng[cond]
+        # Add correction to make these equal actual radial mode order
+        # not just index of nominal l=1 p-mode frequency
+        self.l1_np = self.l1_np[cond] + self.n.min()
         # Still need to assign radial  order to mixed modes!
-        tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+        tmp = pd.DataFrame(data=np.c_[self.l1_np,
                                       [1]*len(self.l1_mixed_freqs), 
                                       [0]*len(self.l1_mixed_freqs),
                                       self.l1_mixed_freqs,
+                                      np.arange(0, len(self.l1_mixed_freqs), 1), 
                                       self.l1_zeta], 
-                           columns=['n', 'l', 'm', 'Frequency', 'zeta'])         
+                           columns=['n', 'l', 'm', 'Frequency', 'n_g', 'zeta'])         
         self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)
 
-    def generate_rotational_splittings(self, split_core, DPi1, coupling, eps_g, split_env=0., l=1, method='simple'):
+    def generate_rotational_splittings(self, split_core, DPi1, coupling, eps_g, split_env=0., l=1, 
+                                       method='simple'):
         """
         Generate rotational splittings
         """
+
+        #print(self.calc_method)
+
         if l == 1:
             if method == 'simple':
                 # Use method from Dehevuels et al. (2015)
                 splitting = (split_core/2 - split_env) * self.l1_zeta + split_env
                 self.l1_mixed_freqs_p1 = self.l1_mixed_freqs + splitting
                 self.l1_mixed_freqs_n1 = self.l1_mixed_freqs - splitting
-                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                tmp = pd.DataFrame(data=np.c_[self.l1_np,
                                               [1]*len(self.l1_mixed_freqs), 
                                               [+1]*len(self.l1_mixed_freqs),
                                               self.l1_mixed_freqs_p1,
+                                              np.arange(0, len(self.l1_mixed_freqs), 1), 
                                               self.l1_zeta], 
-                                columns=['n', 'l', 'm', 'Frequency', 'zeta'])         
+                                   columns=['n', 'l', 'm', 'Frequency', 'n_g', 'zeta'])         
                 self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)                
-                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                tmp = pd.DataFrame(data=np.c_[self.l1_np,
                                               [1]*len(self.l1_mixed_freqs), 
                                               [-1]*len(self.l1_mixed_freqs),
                                               self.l1_mixed_freqs_n1,
+                                              np.arange(0, len(self.l1_mixed_freqs), 1), 
                                               self.l1_zeta], 
-                                columns=['n', 'l', 'm', 'Frequency', 'zeta'])         
+                                   columns=['n', 'l', 'm', 'Frequency', 'n_g', 'zeta'])         
                 self.full_freqs = self.full_freqs.append(tmp, ignore_index=True) 
 
             elif method == 'Mosser':
@@ -148,12 +170,27 @@ class Frequencies(object):
                     self.l1_int_zeta_p, self.l1_int_zeta_n = mixed_modes.l1_theoretical_rot_M(self.l1_mixed_freqs,
                                                                                               split_core, 
                                                                                               zeta_func)
+                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                    [1]*len(self.l1_mixed_freqs), 
+                                    [+1]*len(self.l1_mixed_freqs),
+                                    self.l1_mixed_freqs_p1,
+                                    self.l1_int_zeta_p], 
+                    columns=['n', 'l', 'm', 'Frequency', 'zeta'])   
+                self.full_freqs = self.full_freqs.append(tmp, ignore_index=True)                
+                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                              [1]*len(self.l1_mixed_freqs), 
+                                              [-1]*len(self.l1_mixed_freqs),
+                                              self.l1_mixed_freqs_n1,
+                                              self.l1_int_zeta_n], 
+                                columns=['n', 'l', 'm', 'Frequency', 'zeta'])         
+                self.full_freqs = self.full_freqs.append(tmp, ignore_index=True) 
             else:
                 sys.exit("Oh dear, method keyword isn't correct!")
         else:
             pass
 
     def generate_tau_values(self, DPi1, coupling, eps_g):
+        print("NEED TO UPDATE FUNCTION ARGUMENTS TO TAKE IN MIXED MODE CALCULATION METHOD!")
         new_frequency, tau, zeta_func = mixed_modes.stretched_pds(self.frequency, 
                                                     self.l1_nom_freqs,
                                                     self.delta_nu, DPi1, coupling, eps_g)
