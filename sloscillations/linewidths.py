@@ -31,18 +31,28 @@ class Linewidths(amplitudes.Amplitudes):
         Generate radial mode linewidths
         """
         self.l0_linewidths = utils.compute_linewidths(self.l0_freqs, self.numax)
+        self.mode_data.loc[self.mode_data['l'] == 0, 'linewidth'] = self.l0_linewidths
 
     def generate_quadrupole_modes(self):
         """
-        Generate quadrupole mode linewidths
+        Generate l=2 mode linewidths
         """
         self.l2_linewidths = utils.compute_linewidths(self.l2_freqs, self.numax)
+        self.mode_data.loc[self.mode_data['l'] == 2, 'linewidth'] = self.l2_linewidths
+
+    def generate_octupole_modes(self):
+        """
+        Generate l=3 mode linewidths
+        """
+        self.l3_linewidths = utils.compute_linewidths(self.l3_freqs, self.numax)
+        self.mode_data.loc[self.mode_data['l'] == 3, 'linewidth'] = self.l3_linewidths
 
     def generate_nominal_dipole_modes(self):
         """
         Generate nominal l=1 mode linewidths
         """
         self.l1_nom_linewidths = utils.compute_linewidths(self.l1_nom_freqs, self.numax)
+        self.mode_data.loc[self.mode_data['l'] == -1, 'linewidth'] = self.l1_nom_linewidths
 
     def generate_mixed_dipole_modes(self):
         """
@@ -58,7 +68,8 @@ class Linewidths(amplitudes.Amplitudes):
             cond = (self.l1_np == radial_order[i])
             self.l1_mixed_linewidths = np.append(self.l1_mixed_linewidths,
                                         self.l1_nom_linewidths[i] * (1 - self.l1_zeta[cond]))
-
+        self.mode_data.loc[(self.mode_data['l'] == 1) & (self.mode_data['m'] == 0), 'linewidth'] = self.l1_mixed_linewidths
+ 
         if self.calc_rot:
             # Also generate linewidths for rotationally split components if they exist
             if hasattr(self, 'l1_mixed_freqs_p1') and (self.method=='simple'):
@@ -68,6 +79,8 @@ class Linewidths(amplitudes.Amplitudes):
                     cond = (self.l1_np == radial_order[i])
                     self.l1_mixed_linewidths_p1 = np.append(self.l1_mixed_linewidths_p1,
                                                 self.l1_nom_linewidths[i] * (1 - self.l1_zeta[cond]))
+                self.mode_data.loc[(self.mode_data['l'] == 1) & (self.mode_data['m'] == +1), 'linewidth'] = self.l1_mixed_linewidths_p1
+
             elif hasattr(self, 'l1_mixed_freqs_p1') and (self.method=='Mosser'):
                 sys.exit()
             if hasattr(self, 'l1_mixed_freqs_n1') and (self.method=='simple'):
@@ -77,10 +90,14 @@ class Linewidths(amplitudes.Amplitudes):
                     cond = (self.l1_np == radial_order[i])
                     self.l1_mixed_linewidths_n1 = np.append(self.l1_mixed_linewidths_n1,
                                                 self.l1_nom_linewidths[i] * (1 - self.l1_zeta[cond]))
+                self.mode_data.loc[(self.mode_data['l'] == 1) & (self.mode_data['m'] == -1), 'linewidth'] = self.l1_mixed_linewidths_n1
+
             else:
                 sys.exit()
 
-    def __call__(self, entries):
+
+
+    def __call__(self, entries=dict()):
         """
         Run computation
         """
@@ -93,6 +110,8 @@ class Linewidths(amplitudes.Amplitudes):
         # l=2 modes
         if self.calc_l2:
             self.generate_quadrupole_modes()
+        if self.calc_l3:
+            self.generate_octupole_modes()
         # l=1 nominal p-modes
         if self.calc_nom_l1:
             self.generate_nominal_dipole_modes()  

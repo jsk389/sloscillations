@@ -164,7 +164,7 @@ class GenerateData:
         # Timeseries based quantities
         #############################
         for (columnName, columnData) in metadata.iteritems():
-            setattr(self, columnName, columnData.values)
+            setattr(self, columnName, columnData)
         
         #self.dt = metadata['dt'].values
         #self.T = metadata['T'].values
@@ -239,7 +239,8 @@ class GenerateData:
             self.dt = 1e6/(2*self.nyq)
         else:
             sys.exit('Either T and dt or nyq and bw need to be given!')
-        self.frequency = np.arange(self.bw, self.nyq, self.bw)
+        # 20/12/2020 Now go to sampling frequency to allow for super-nyquist stars!
+        self.frequency = np.arange(self.bw, 2*self.nyq, self.bw)
 
 
 
@@ -253,7 +254,7 @@ class GenerateData:
 
 
         # Construct parameter dictionary from metadata
-        print(f"Inclination Angle: {self.inclination_angle} degrees")
+        #print(f"Inclination Angle: {self.inclination_angle} degrees")
         # Set up frequencies class
         self.freqs = frequencies.Frequencies(frequency=self.frequency,
                             numax=self.numax, 
@@ -271,9 +272,9 @@ class GenerateData:
                             Henv=1114.117,
                             denv=2*np.sqrt(2*np.log(2)) * 9.778543)
         # Compute frequencies
-        print(self.freqs.freq_attrs)
+        #print(self.freqs.freq_attrs)
         self.freqs()
-        sys.exit()
+        #sys.exit()
 
         # Compute amplitudes
         self.amps = amplitudes.Amplitudes(self.freqs)
@@ -302,7 +303,7 @@ class GenerateData:
                                              row['frequency'],
                                              row['linewidth'],
                                              row['height'])
-        test = pd.read_csv('../../../TACO/data/008546976/pds.csv')
+        #test = pd.read_csv('../../../TACO/data/008546976/pds.csv')
         #plt.plot(test['frequency'], test['power'], zorder=-1, color='k')
         #plt.plot(self.frequency, -np.log(np.random.uniform(0, 1, len(model)))*model, color='k', zorder=0)
         #plt.plot(self.frequency, model, color='r', lw=2, zorder=0)
@@ -332,7 +333,7 @@ class GenerateData:
         # model from Kallinger (2014)
         y = gp.sample()
 
-        print(self.data)
+        #print(self.data)
         data = self.data.loc[self.data['l'] >= 0, ]
 
         # Compute the kernel of the oscillation mode
@@ -391,7 +392,7 @@ class GenerateData:
         #print(f"Epsilon p: {self.eps_p}")
         self._write_attrs()
 
-        return t, y, self.data
+        return t, y, self.data, psd + 2e-6*self.white**2*self.dt
 
 
 

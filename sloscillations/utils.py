@@ -10,18 +10,37 @@ from celerite import terms
 
 from . import scaling_relations
 
-def compute_linewidths(freqs, numax):
+def compute_mixed_heights(amplitude, linewidth, T, zeta):
+    """
+    Compute the mixed mode height using the expression from eqn 6.148 of 
+    Basu & Chaplin (2017)
+    """
+    return ((2 * amplitude**2 * T) / (np.pi * T * linewidth*1e-6 + 2/(1-zeta))) * 1e-6
+
+def compute_model(frequency, freq, lwd, height):
+    x = (2/lwd) * (frequency - freq)
+    return height / (1 + x**2)
+
+def compute_heights(amplitude, linewidth, T):
+    """
+    Compute the mode height from Fletcher et al. (2006) 
+    (http://articles.adsabs.harvard.edu/pdf/2006MNRAS.371..935F)
+    """
+    return ((2 * amplitude**2 * T) / (np.pi * T * linewidth*1e-6 + 2)) * 1e-6
+
+def compute_linewidths(freqs, numax, Teff=4800):
     """
     Compute mode linewidths using eqn 4.7 from Lund et al. (2016)
     """
-    alpha, gamma_a, gamma_dip, W_dip, nu_dip, fwhm_dip = scaling_relations.gamma_scaling(numax)
-    print(alpha, gamma_a, gamma_dip, W_dip, nu_dip)
-    print(freqs, numax)
-    term1 = alpha * np.log(freqs / numax) + np.log(gamma_a)
-    term2 = np.log(gamma_dip) / (1 + ((2*np.log(freqs/nu_dip))/np.log(W_dip/numax))**2)
+    #alpha, gamma_a, gamma_dip, W_dip, nu_dip, fwhm_dip = scaling_relations.gamma_scaling(numax)
+    #print(alpha, gamma_a, gamma_dip, W_dip, nu_dip)
+    #print(freqs, numax)
+    #term1 = alpha * np.log(freqs / numax) + np.log(gamma_a)
+    #term2 = np.log(gamma_dip) / (1 + ((2*np.log(freqs/nu_dip))/np.log(W_dip/numax))**2)
 
-    lnGamma = term1 + term2
-    return np.exp(lnGamma)
+    #lnGamma = term1 + term2
+    #return np.exp(lnGamma)
+    return np.ones_like(freqs) * scaling_relations.gamma_0_scaling(Teff)
 
 def calculateS0(a, b):
     """

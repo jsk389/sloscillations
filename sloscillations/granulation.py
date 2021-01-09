@@ -17,7 +17,7 @@ class Granulation(object):
     Gaussian process in the time domain
     """
 
-    def __init__(self, time, numax, amplitude=None, frequencies=None, white=0, n_comps=2):
+    def __init__(self, time, dt, numax, kmag=11.0, amplitude=None, frequencies=None, white=None, n_comps=2):
         """
 
         Parameters
@@ -39,6 +39,8 @@ class Granulation(object):
         """
 
         self.time = time
+        self.dt = dt
+        self.kmag = kmag
         # Number of granulation components defaults to 2 - only 2 are currently supported
         self.n_comps = n_comps
 
@@ -52,7 +54,10 @@ class Granulation(object):
             self.frequencies = self._scaling_relation(parameter='frequencies')
         else:
             self.frequencies = frequencies
-        self.white = white
+        if white is None:
+            self.white = 0.0 #self._scaling_relation(parameter='white')
+        else:
+            self.white = white
 
     def _scaling_relation(self, parameter):
         """
@@ -60,10 +65,18 @@ class Granulation(object):
         """
         if parameter == 'amplitude':
             # Amplitude of the granulation components
-            return 3382 * self.numax ** -0.609
+            return np.array([3382 * self.numax ** -0.609] * self.n_comps)
         elif parameter == 'frequencies':
             # Characteristic frequencies of the granulation components
             return np.array([0.317 * self.numax ** 0.970, 0.948 * self.numax ** 0.992])
+        elif parameter == 'white':
+            # Compute white noise contribution using the formulae given in Chaplin 
+            # et al. (2014)
+            c = 3.46*10**(0.4*(12 - self.kmag) + 8)
+            sigma = 1e6 * np.sqrt(c + 7e7) / c
+            # Compute white noise from sigma using the formula given in Chaplin et
+            # al. (2014)
+            return sigma
         else:
             sys.exit(f'Incorrent parameter name given {parameter}')
     
@@ -83,6 +96,7 @@ class Granulation(object):
         if np.isscalar(self.amplitude):
             self.amplitude = np.array([self.amplitude]*self.n_comps)
         model = np.zeros(len(frequency))
+        model += 2.0e-6 * self.white**2.0 * self.dt
         for i in range(len(self.frequencies)):
             height = ((2.0 * np.sqrt(2))/np.pi) * self.amplitude[i]**2/self.frequencies[i]
             model += height / (1 + (frequency/self.frequencies[i])**4)
@@ -99,7 +113,7 @@ class Granulation(object):
         self.kernel = terms.JitterTerm(log_sigma = np.log(self.white))
 
         self.S0, self.omega_w = self.calculateS0()
-        print(f"S0: {self.S0}")
+        #print(f"S0: {self.S0}")
         for i in range(len(self.S0)):
             self.kernel += terms.SHOTerm(log_S0=np.log(self.S0[i]),
                                     log_Q=np.log(1/np.sqrt(2)),

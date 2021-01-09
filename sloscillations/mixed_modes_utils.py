@@ -8,8 +8,36 @@ from scipy import interpolate
 from scipy.integrate import quad
 from scipy.optimize import brentq, ridder
 
+def all_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, return_order=True, method='Mosser2018_update'):
 
-def all_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, return_order=True, calc_zeta=True, method='Mosser2018_update'):
+    l1_freqs = []
+    l1_g_freqs = []
+    order = []
+    N_g = []
+
+    for i in range(len(nu_p)):
+
+        if nu_p[i] > nu_zero[-1]:
+            radial = np.array([nu_zero[-1], nu_zero[-1] + delta_nu[i]])
+        else:
+            radial = np.array([nu_zero[i], nu_zero[i+1]])
+            
+        tmp, tmp_g, tmp_ng = find_mixed_l1_freqs(delta_nu[i], radial, nu_p[i], 
+                                         DPi1, eps_g, coupling, method=method)
+        order.append([i]*len(tmp))
+        l1_freqs.append(tmp)
+        l1_g_freqs.append(tmp_g)
+        N_g.append(tmp_ng)
+
+    if return_order:
+        return np.array(list(itertools.chain(*l1_freqs))), \
+               np.array(list(itertools.chain(*order))), \
+               np.array(list(itertools.chain(*l1_g_freqs))), \
+               np.array(list(itertools.chain(*N_g)))
+    else:
+        return np.array(list(itertools.chain(*l1_freqs)))
+
+def old_all_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, return_order=True, calc_zeta=True, method='Mosser2018_update'):
 
     l1_freqs = []
     l1_g_freqs = []
@@ -64,7 +92,6 @@ def find_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, method='
     N_modes = (delta_nu * 1e-6) / (DPi1 * (nu_p*1e-6)**2)
     #print("NUMBER OF MIXED MODES: ", N_modes+1)
     
-    
     # Changed to this to be exactly the same as Mosser 2018
     #nmin = np.floor(1 / (DPi1*1e-6 * (nu_p + (delta_nu/2))) - eps_g)
     #nmax = np.floor(1 / (DPi1*1e-6 * (nu_p - (delta_nu/2))) - eps_g)
@@ -97,7 +124,11 @@ def find_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling, method='
     #    g_mode_freqs = np.append(g_mode_freqs, tmp_g)
     #    N_g = np.append(N_g, tmp_ng)
     #print("NUMBER OF MIXED MODES FOUND: ", len(frequencies[np.isfinite(frequencies)]))
-    return np.sort(frequencies[np.isfinite(frequencies)]), np.sort(g_mode_freqs[np.isfinite(g_mode_freqs)]), np.sort(N_g[np.isfinite(N_g)])
+    # 03/01/2021 - changing this bit as sorting incorrectly!
+    #return np.sort(frequencies[np.isfinite(frequencies)]), np.sort(g_mode_freqs[np.isfinite(g_mode_freqs)]), np.sort(N_g[np.isfinite(N_g)])
+    idx = np.argsort(frequencies[np.isfinite(frequencies)])
+    return frequencies[np.isfinite(frequencies)][idx], g_mode_freqs[np.isfinite(frequencies)][idx], N_g[np.isfinite(frequencies)][idx]
+
 
 def find_nearest(array, value):
     array = np.asarray(array)
@@ -117,8 +148,8 @@ def find_mixed_l1_freqs_hekker(delta_nu, pzero, pone, DPi1, eps_g, coupling, N):
 
     # Compute phi
     phi = np.arctan2(coupling, np.tan(theta_p))
-    plt.plot(f, (theta_p), '.')
-    plt.show()
+    #plt.plot(f, (theta_p), '.')
+    #plt.show()
     #f = f[cond]
 
     #plt.plot(f, phi)
@@ -147,12 +178,12 @@ def find_mixed_l1_freqs_hekker(delta_nu, pzero, pone, DPi1, eps_g, coupling, N):
     # Compute period of mixed modes
     mixed_period = (-ng + eps_g + 1/2 - phi[index][cond]/np.pi) * DPi1
 
-    plt.plot(f, psi, '.')
-    for i in (1e6/mixed_period):
-        plt.axvline(i, color='r', linestyle='--', alpha=0.5)
-    plt.axvline(pzero[0], color='r', alpha=0.5)
-    plt.axvline(pzero[1], color='r', alpha=0.5)
-    plt.show()
+    #plt.plot(f, psi, '.')
+    #for i in (1e6/mixed_period):
+    #    plt.axvline(i, color='r', linestyle='--', alpha=0.5)
+    #plt.axvline(pzero[0], color='r', alpha=0.5)
+    #plt.axvline(pzero[1], color='r', alpha=0.5)
+    #plt.show()
 
     # Compute mixed mode frequency
     mixed_nu = 1e6/mixed_period
@@ -166,7 +197,6 @@ def find_mixed_l1_freq_(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method=
     """
     Find individual mixed mode
     """
-
     def opt_func(nu):
         theta_p = (np.pi / (pzero[1]-pzero[0])) * (nu - pone)
         #theta_g = np.pi * (1 / (DPi1*1e-6*nu) - eps_g)
@@ -201,8 +231,8 @@ def find_mixed_l1_freq_(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method=
     elif method == 'Mosser2018_update':
         nu_g = 1 / (DPi1*1e-6 * (N + 1/2 + eps_g))
         # Go +/- 1/2 * DPi1 away from g-mode period
-        lower_bound = 1 / (DPi1*1e-6 * (N     + 1/2 + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
-        upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2 + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
+        lower_bound = 1 / (DPi1*1e-6 * (N     + 1/2  + 1/2 + eps_g)) + np.finfo(float).eps * 1e4
+        upper_bound = 1 / (DPi1*1e-6 * (N - 1 + 1/2  + 1/2 + eps_g)) - np.finfo(float).eps * 1e4
 
     if method != 'Mosser2015':
         #print(lower_bound, upper_bound, nu_g)
@@ -233,7 +263,10 @@ def find_mixed_l1_freq_(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method=
                     soln = ff[idx]
                 
                 #plt.plot(ff, y, '.')
-                #plt.axvline(nu_g[i], color='C1')
+                #if i == 0:
+                #    plt.axvline(nu_g[i], color='C1', label=r'$\nu_{\mathrm{g}}$')
+                #else:
+                #    plt.axvline(nu_g[i], color='C1')
                 #for i in soln:
                 #    plt.axvline(i, color='b', linestyle='--')
                 #plt.ylim(-10, 10)
@@ -242,6 +275,7 @@ def find_mixed_l1_freq_(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method=
         #print(len(solns))
         """
         plt.xlim(pzero[0]-0.1, pzero[1]+0.1)
+        plt.axhline(0, color='k', alpha=0.25, zorder=-1)
         plt.xlabel(r'Frequency ($\mu$Hz)', fontsize=18)
         plt.ylabel(r'$\tan\theta_{p} - q\tan\theta_{g}$', fontsize=18)
         plt.axvline(pzero[1], linestyle=':', color='r', label=r'$\nu_{n+1,\ell=0}$')
@@ -324,11 +358,11 @@ def find_mixed_l1_freq_(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method=
         n_g = (np.floor(g_period / DPi1) - eps_g) 
        
         if len(soln) < 1:
-            return np.nan, np.nan, np.nan
+            return np.array([np.nan]), np.array([np.nan]), np.array([np.nan])
         else:
             return soln, 1e6/g_period, n_g
 
-def find_mixed_l1_freq(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method='Mosser2018_update'):
+def find_mixed_l1_freq(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method='Mosser2015'):
     """
     Find individual mixed mode
     """
@@ -463,9 +497,6 @@ def l1_theoretical_rot_M(l1_m0_freqs, drot, zeta_fun, max_iters=50, tol=1e-4):
         l_mn1_freqs = np.append(l_mn1_freqs, tmp_n1)
         int_zeta_n = np.append(int_zeta_n, tmp_iz_n)
 
-        #st.write(l1_m0_freqs[i], tmp_p1, tmp_p1-l1_m0_freqs[i])
-        #st.write(l1_m0_freqs[i], tmp_n1, l1_m0_freqs[i]-tmp_n1)
-        #sys.exit()
     return l_mp1_freqs, l_mn1_freqs, int_zeta_p, int_zeta_n
 
 def calculate_zeta_(freq, nu_p, DeltaNu, DPi1, coupling, eps_g):
@@ -483,7 +514,78 @@ def calculate_zeta(freq, nu_p, DeltaNu, DPi1, coupling, eps_g):
     inv_zeta = 1 + coupling/N * 1/denominator
     return 1 / inv_zeta 
 
-def zeta_interp(freq, nu_p, delta_nu, 
+def _interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1, plot=False):
+    """
+    Compute zeta for each radial order
+    """
+    zeta_max = np.zeros(len(nu_p))
+    model = np.zeros_like(frequency)
+    for i in range(len(nu_p)):
+        # Only compute θₚ from one radial mode frequency to the next
+        if i == len(nu_zero)-1:
+            dnu = delta_nu[i] + (delta_nu[i] - delta_nu[i-1])
+            cond = (frequency > nu_zero[i]) & (frequency < nu_zero[i] + dnu)
+            
+            # Estimate deltanu from radial mode frequencies
+        else:
+            cond = (frequency > nu_zero[i]) & (frequency < nu_zero[i+1])
+            dnu = delta_nu[i]
+        
+        θₚ = np.pi*(frequency[cond] - nu_p[i])/dnu
+        N = (dnu*1e-6)/(DPi1 * (nu_p[i]*1e-6)**2)
+        frac = 1 + (coupling/N) * (coupling**2*np.cos(θₚ)**2 + np.sin(θₚ)**2)**-1
+        zeta_max[i] = 1/(1 + coupling/N)
+        if plot:
+            plt.plot(frequency[cond], frac**-1 + (1 - zeta_max[i]))
+        model[cond] = frac**-1 + (1 - zeta_max[i])
+    return model, zeta_max
+
+def interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1, plot=False):
+    """
+    Compute the mixing function zeta for all frequency values
+
+    Inputs:
+
+        :params freq: Full frequency array
+        :type   freq: numpy.ndarray
+
+        :params delta_nu: Large frequency separation
+        :type   delta_nu: float
+
+        :params nu_zero: Array of radial mode frequencies
+        :type   nu_zero: numpy.ndarray
+
+        :params nu_p: Array of nominal p-mode frequencies
+        :type   nu_p: numpy.ndarray
+
+        :params coupling: Mode coupling
+        :type   coupling: float
+
+        :params DPi1: l=1 period spacing
+        :type   DPi1: float
+
+    """
+   
+   # N = (delta_nu*1e-6)/(DPi1 * (nu_p*1e-6)**2)
+    
+    #zeta_max = (1 + (coupling/N))**-1
+    #zeta_min = (1 + (1/(coupling*N)))**-1
+
+    # Compute zeta over each radial order
+    model, zeta_max = _interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, 
+                         coupling, DPi1, plot=plot)
+
+    # Interpolate zeta_max across all frequency
+    # TODO: 27/12/2020 why nu_p? Should it be nu_zero?
+    backg = np.interp(frequency, nu_p, zeta_max)
+    
+    # Add background back into zeta
+    full_model = model - (1 - backg)
+    
+    return full_model #, zeta_max, zeta_min
+
+
+def zeta_interp(freq, nu_zero, nu_p, delta_nu, 
                 DPi1, coupling, eps_g,
                 numDPi1=100, DPi1_range=[0.99, 1.01], return_full=False):
     # Interpolate zeta function
@@ -493,10 +595,14 @@ def zeta_interp(freq, nu_p, delta_nu,
 
     for i in range(len(DPi1_vals)):
         #print(DPi1_vals[i])
-        tmp_l1_freqs, tmp_zeta, _ = all_mixed_l1_freqs(delta_nu, nu_p, DPi1_vals[i], eps_g, coupling, calc_zeta=True)
+        tmp_l1_freqs, tmp_zeta = old_all_mixed_l1_freqs(delta_nu, nu_zero, nu_p, DPi1_vals[i], eps_g, coupling, return_order=False, calc_zeta=True)
 
         l1_freqs = np.append(l1_freqs, tmp_l1_freqs)
         zeta = np.append(zeta, tmp_zeta)
+        
+        #plt.scatter(tmp_l1_freqs, tmp_zeta, marker='.', label=DPi1_vals[i])
+    #plt.legend(loc='best')
+    #plt.show()
 
     l1_freqs = l1_freqs.ravel()
     zeta = zeta.ravel()
@@ -506,13 +612,53 @@ def zeta_interp(freq, nu_p, delta_nu,
     zeta = zeta[idx]
 
 
+
     zeta_fun = interpolate.interp1d(l1_freqs, zeta)
 
     if return_full:
         return l1_freqs, zeta, zeta_fun
     return zeta_fun
 
-def stretched_pds(frequency, nom_l1_freqs, DeltaNu, 
+def stretched_pds(frequency, zeta, oversample=1):
+    # Compute frequency bin-width
+    bw = frequency[1]-frequency[0]
+
+    # Compute dtau
+    if oversample > 1:
+        frequency = np.arange(frequency.min(), frequency.max(), bw/oversample)
+        zeta = np.interp(frequency, frequency, zeta)
+        dtau = 1 / (zeta*(frequency*1e-6)**2)
+    else:
+        dtau = 1 / (zeta*(frequency*1e-6)**2)
+    
+
+    #dtau[np.isnan(dtau)] = 0
+    #dtau = dtau[np.isfinite(dtau)]
+    # Compute tau
+    tau = np.cumsum(dtau)*(bw/oversample * 1e-6)# + 13.8
+    #print(tau)
+
+#    tau -= shift
+    #print(min(tau), frequency[tau == np.min(tau)])
+    #tau -= np.min(tau)
+ 
+
+    return frequency, tau, zeta #, shift
+
+def compute_tau_shift(tau, DPi1):
+    """
+    Compute shift in tau to line up m=0 at tau mod DeltaPi1 = 0
+    """
+    # Compute shift properly
+    shift = np.mean(((tau % DPi1) / DPi1 - 1))
+    return shift
+
+
+def peaks_stretched_period(frequency, pds_frequency, tau):
+    assert len(tau) == len(pds_frequency)
+    return np.interp(frequency, pds_frequency, tau)
+
+def oldstretched_pds(frequency, nu_zero, nom_l1_freqs, DeltaNu, 
                   DPi1, coupling, eps_g, 
                   numDPi1=100, DPi1_range=[0.99, 1.01], oversample=1):
     # Compute frequency bin-width
@@ -520,7 +666,7 @@ def stretched_pds(frequency, nom_l1_freqs, DeltaNu,
     cond = (frequency > nom_l1_freqs.min()) & (frequency < nom_l1_freqs.max())
     frequency = frequency[cond]
     # Compute interpolated zeta across entire frequency range
-    l1_freqs, zz, zeta_fun = zeta_interp(frequency,
+    l1_freqs, zz, zeta_fun = zeta_interp(frequency, nu_zero,
                                          nom_l1_freqs, DeltaNu,
                                          DPi1, coupling, eps_g,
                                          numDPi1, DPi1_range,
@@ -560,7 +706,3 @@ def stretched_pds(frequency, nom_l1_freqs, DeltaNu,
     #tau = tau - tau_shift + DPi1
 
     return new_freq, tau, zeta_fun
-
-def peaks_stretched_period(frequency, pds_frequency, tau):
-    assert len(tau) == len(pds_frequency)
-    return np.interp(frequency, pds_frequency, tau)

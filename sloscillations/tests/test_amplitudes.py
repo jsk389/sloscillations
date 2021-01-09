@@ -13,26 +13,21 @@ def test_amplitudes():
     freqs = frequencies.Frequencies(frequency=frequency,
                                           numax=103.2, 
                                           delta_nu=9.57, 
-                                          radial_order_range=[-5, 5])
-    # Eventually want this to read in from a configuration file
-    params = {'calc_l0': True,
-              'calc_l2': True,
-              'calc_nom_l1': True,
-              'calc_mixed': True,
-              'calc_rot': False,
-              'DPi1': 77.9,
-              'coupling': 0.2,
-              'eps_g': 0.0,
-              'split_core': 0.5,
-              'split_env': 0.0,
-              'l': 1,
-              'method': 'simple'}
-    freqs(params)
+                                          radial_order_range=[-5, 5],
+                                          DPi1 = 77.9,
+                                          coupling = 0.2,
+                                          eps_g = 0.0,
+                                          split_core = 0.15,
+                                          calc_rot = False)
+
+    # Set up frequencies class
+    freqs()
 
     # Set up class
     amps = amplitudes.Amplitudes(freqs)
-
-    amps(params)
+    print(f"Henv: {freqs.Henv}")
+    print(f"denv: {freqs.denv}")
+    amps()
     # l=0 amplitudes
     #amps.generate_radial_modes()
     # l=2 amplitudes
@@ -45,6 +40,8 @@ def test_amplitudes():
              color='r', marker='D', linestyle='None', label='$\ell=0$')
     plt.plot(amps.l2_freqs, amps.l2_amps, 
              color='g', marker='s', linestyle='None', label='$\ell=2$')
+    plt.plot(amps.l3_freqs, amps.l3_amps, 
+             color='y', marker='*', linestyle='None', label='$\ell=3$')
     plt.plot(amps.l1_nom_freqs, amps.l1_nom_amps, 
              color='b', marker='o', linestyle='None', label='Nominal $\ell=1$')
     plt.plot(amps.l1_mixed_freqs, amps.l1_mixed_amps, 
