@@ -118,7 +118,6 @@ class Frequencies(object):
         if self.split_core is None:
             self.calc_rot = False
 
-
         #tmp = self.__dict__
 
         #tmp = {k: (v.tolist() if type(v) == np.ndarray else v) for k, v in tmp.items()}
@@ -305,11 +304,12 @@ class Frequencies(object):
         else:
             pass
 
-    def generate_tau_values(self, DPi1, coupling, eps_g, compute_all_tau=True, shift=0.0):
-
+    def generate_tau_values(self, compute_all_tau=True, shift=0.0):
+        #DPi1, coupling, eps_g, 
         # Recompute tau if needed, but for example if only changing rotational
         # splitting then don't need to recompute tau for m=0 modes, only need 
         # to interpolate to compute tau for m=+/-1
+    
         if compute_all_tau:
             self.new_frequency, self.tau, self.new_zeta = mixed_modes.stretched_pds(self.frequency, 
                                                                                      self.zeta)
@@ -318,18 +318,19 @@ class Frequencies(object):
             self.l1_mixed_tau = mixed_modes.peaks_stretched_period(self.l1_mixed_freqs, 
                                                                 self.new_frequency, 
                                                                 self.tau)
+
             # Compute shift
-            self.shift = mixed_modes.compute_tau_shift(self.l1_mixed_tau, DPi1)
-            self.l1_mixed_tau -= self.shift * DPi1
+            self.shift = mixed_modes.compute_tau_shift(self.l1_mixed_tau, self.DPi1)
+            self.l1_mixed_tau -= self.shift * self.DPi1
             if self.calc_rot:
                 self.l1_mixed_tau_p1 = mixed_modes.peaks_stretched_period(self.l1_mixed_freqs_p1, 
                                                                     self.new_frequency, 
                                                                     self.tau)
-                self.l1_mixed_tau_p1 -= self.shift * DPi1
+                self.l1_mixed_tau_p1 -= self.shift * self.DPi1
                 self.l1_mixed_tau_n1 = mixed_modes.peaks_stretched_period(self.l1_mixed_freqs_n1, 
                                                                     self.new_frequency, 
                                                                     self.tau)
-                self.l1_mixed_tau_n1 -= self.shift * DPi1
+                self.l1_mixed_tau_n1 -= self.shift * self.DPi1
 
     def plot_echelle(self, l0=True, l2=True, l3=True, l1=True, mixed=True, 
                      rotation=True, shift=None):

@@ -6,6 +6,9 @@ import lightkurve as lk
 import matplotlib.pyplot as plt
 import numpy as np 
 import pandas as pd
+import torch
+import os
+
 
 from astropy.units import cds
 from . import utils
@@ -17,7 +20,72 @@ from scipy.interpolate import interp1d
 #from linewidths import Linewidths
 #from heights import Heights
 
+from pathlib import Path
+
+from torch.distributions import MultivariateNormal
+
+from .nf import *
+from .nf.flows import *
+from .nf.models import NormalizingFlowModel
+
 cds.enable()
+
+# Mean and standard deviation of data for input into normalising flow
+# ['A2', 'A3', 'b2', 'b3', 'Pg', 'numax', 'sigmaEnv', 'Teff', '[Fe/H]', 'Phase', 'mu', 'sigma']
+mean_x = np.array([2.2605, 1.1830, 1.1623, 1.6928, 1.5536, 1.6898, 0.8320, 3.6894, 4.8708, 1.4897, 2.2212, 0.7104])
+std_x = np.array([0.6782, 1.1419, 0.2715, 0.2963, 0.9219, 0.3022, 0.2107, 0.0195, 0.3086, 0.5030, 0.2796, 0.2170])
+cols_to_log = [2, 3, 5, 6, 7]
+power_parameters = [0, 1, 4]
+
+#def unscale_samples(samples):
+#    """
+#    Convert the samples from the scaled normalising flow
+#    representation to the proper unscaled representation
+#    of the original parameters
+#    """
+#    # Columns that have been logged - b2, b3, numax, sigmaEnv, Teff and [Fe/H]
+path = Path(__file__).parent / "../data/test.csv"
+
+def background_flow():
+    n_flows = 5
+    dim = 12
+    flow = eval("NSF_AR")
+    flows = [flow(dim=dim, K=8, B=3, hidden_dim=32) for _ in range(n_flows)]
+    prior = MultivariateNormal(torch.zeros(dim), torch.eye(dim))
+    model = NormalizingFlowModel(prior, flows)
+    return model
+
+def sample_from_normalising_flow(model="Full_scaling_NSF_AR_5_5000.pt", n_samples=16_000, scaled=True):
+    """
+    Sample from normalising flow and create all the parameters
+
+    """
+    model_state = Path(__file__).parent / f"../NormalisingFlowModels/{model}"
+    # Load up model
+    flow_model = background_flow()
+    flow_model.load_state_dict(torch.load(model_state))
+
+    #flow_model = torch.load(model)
+    # Sample from normalising flow model
+    samples = flow_model.sample(n_samples).data.numpy()
+    # First unscaling of samples
+    print(np.shape(samples), np.shape(std_x[:,None]))
+    unscaled_samples = (samples * std_x[None,:]) + mean_x[None, :]
+    if scaled:
+        # Add in power scaling
+        unscaled_samples[:, power_parameters] = (unscaled_samples[:, power_parameters] * unscaled_samples[:,-1:]) + unscaled_samples[:,-2:-1]
+        # Second unscaling
+        unscaled_samples[:, cols_to_log] = 10**unscaled_samples[:, cols_to_log]
+        unscaled_samples[:, power_parameters] = 10**unscaled_samples[:, power_parameters]
+        # Put granulation amplitude parameters into amplitude rather than power (which they're in from normalising flow)
+        unscaled_samples[:, [0, 1]] = np.sqrt((unscaled_samples[:, [0, 1]] * unscaled_samples[:, [2, 3]])/((2.0 * np.sqrt(2))/np.pi))
+        # Subtract 5 off metallicity
+        unscaled_samples[:, 8] -= 5
+        # Collapse down evolutionary state samples back to 1 and 2
+        unscaled_samples[:,9][unscaled_samples[:,9] <= 1.5] = 1.0
+        unscaled_samples[:,9][unscaled_samples[:,9] > 1.5] = 2.0
+
+    return unscaled_samples
 
 
 class GenerateData:
@@ -47,13 +115,13 @@ class GenerateData:
         self.calc_l3 = True
         self.calc_nom_l1 = True
         self.calc_mixed = True
-        self.calc_rot = True
+        self.calc_rot = False
         self.calc_method = 'Mosser2018update'
         self.l = 1
         self.method = 'simple'
         self.mission = 'Kepler'
         self.evo_state = 'RGB'
-        self.inclination_angle = None
+        self.inclination_angle = 0.0
         self.vis_tot = None
         self.vis1 = None
         self.vis2 = None
@@ -121,9 +189,28 @@ class GenerateData:
         df.to_csv(fname, index=False)
 
 
-    def __init__(self, metadata, data=None):
+    def __init__(self, metadata, data=None, use_normalising_flow=False):
+        """
+        Initialisation of parameters
+
+        Parameters
+        ----------
+        metadata:
+            Metadata (pandas DataFrame)
+        
+        data:
+            DataFrame containing all the frequency, amplitude and linewidth
+            data
+
+        use_normalising_flow:
+            Whether or not to use the normalising flow to generate background-based
+            parameters.
+        """
 
         self._setup_attrs()
+
+        #self.samples = sample_from_normalising_flow()
+ 
 
         # DataFrame containing metadata e.g. length of timeseries etc.
         self.metadata = metadata
@@ -137,7 +224,7 @@ class GenerateData:
         # If it isn't given than calculate the data
         if data is None:
             self.precalculate()
-
+        #sys.exit()
         if self.a1 is not None and self.a2 is not None:
             self.amplitude = [self.a1, self.a2]
                 
@@ -150,7 +237,6 @@ class GenerateData:
                                                    amplitude=self.amplitude,
                                                    frequencies=self.frequencies,
                                                    white=self.white)
-        
         #self.power_spectrum_model()
 
         
@@ -256,6 +342,7 @@ class GenerateData:
         # Construct parameter dictionary from metadata
         #print(f"Inclination Angle: {self.inclination_angle} degrees")
         # Set up frequencies class
+
         self.freqs = frequencies.Frequencies(frequency=self.frequency,
                             numax=self.numax, 
                             delta_nu=self.delta_nu, 
@@ -269,12 +356,14 @@ class GenerateData:
                             split_env=self.split_env,
                             inclination_angle=self.inclination_angle,
                             calc_rot=True,
-                            Henv=1114.117,
-                            denv=2*np.sqrt(2*np.log(2)) * 9.778543)
+                            Henv=self.Henv, #1114.117,
+                            denv=self.denv) #2*np.sqrt(2*np.log(2)) * 9.778543)
         # Compute frequencies
         #print(self.freqs.freq_attrs)
+
         self.freqs()
         #sys.exit()
+
 
         # Compute amplitudes
         self.amps = amplitudes.Amplitudes(self.freqs)
@@ -392,7 +481,7 @@ class GenerateData:
         #print(f"Epsilon p: {self.eps_p}")
         self._write_attrs()
 
-        return t, y, self.data, psd + 2e-6*self.white**2*self.dt
+        return t, y, self.data, f, psd + 2e-6*self.white**2*self.dt
 
 
 

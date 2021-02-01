@@ -15,7 +15,7 @@ def compute_mixed_heights(amplitude, linewidth, T, zeta):
     Compute the mixed mode height using the expression from eqn 6.148 of 
     Basu & Chaplin (2017)
     """
-    return ((2 * amplitude**2 * T) / (np.pi * T * linewidth*1e-6 + 2/(1-zeta))) * 1e-6
+    return ((2 * amplitude**2 * T) / (np.pi * T * linewidth*1e-6 + (2/(1-zeta)))) * 1e-6
 
 def compute_model(frequency, freq, lwd, height):
     x = (2/lwd) * (frequency - freq)

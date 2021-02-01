@@ -73,7 +73,6 @@ class Heights(linewidths.Linewidths):
             self.l1_nom_heights = utils.compute_heights(self.l1_nom_amps, 
                                                               self.l1_nom_linewidths,
                                                               self.T)
-
         # m=0 components
         m0_factor = np.cos(np.radians(self.inclination_angle))**2
         m1_factor = 0.5 * np.sin(np.radians(self.inclination_angle))**2

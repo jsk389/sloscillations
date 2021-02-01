@@ -79,7 +79,16 @@ class Granulation(object):
             return sigma
         else:
             sys.exit(f'Incorrent parameter name given {parameter}')
-    
+
+
+    def calc_Bmax(self, frequency):
+        """
+        Calculate the power in the granulation background at numax
+        """
+        model = self.gran_backg(frequency)
+        idx = np.argmin(abs(frequency - self.numax))
+        return model[idx]
+
     def calculateS0(self):
         # Convert freq from uHz to 1/day
         omega_w = 2*np.pi*self.frequencies# / (1e6/86400.0)
