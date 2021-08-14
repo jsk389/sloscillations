@@ -4,6 +4,7 @@ import itertools
 import numpy as np 
 import matplotlib.pyplot as plt
 
+from copy import deepcopy
 from scipy import interpolate
 from scipy.integrate import quad
 
@@ -139,8 +140,6 @@ def find_mixed_l1_freq_Mosser2018_update_(delta_nu, pzero, pone, DPi1, eps_g, co
     """
     Find mixed modes using updated Mosser 2018 method.
     """
-
-
 
     nu_g = 1 / (DPi1*1e-6 * (N + 1/2 + eps_g))
     # Go +/- 1/2 * DPi1 away from g-mode period
@@ -295,7 +294,7 @@ def find_mixed_l1_freq_(delta_nu, pzero, pone, DPi1, eps_g, coupling, N, method=
             print("OH DEAR")
             return np.nan, np.nan, np.nan
         
-        f = np.linspace(pzero[0], pzero[1], 10000)
+        f = np.linspace(pzero[0], pzero[1], 1000)
         y = opt_func(f)
         
         idx = np.where(np.diff(np.sign(opt_func(f))) > 0)[0]
@@ -593,7 +592,8 @@ def _interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1, plot=
         model[cond] = frac**-1 + (1 - zeta_max[i])
     return model, zeta_max
 
-def interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1, plot=False):
+def interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1, 
+                      osamp=1, plot=False):
     """
     Compute the mixing function zeta for all frequency values
 
@@ -617,6 +617,9 @@ def interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1, plot=F
         :params DPi1: l=1 period spacing
         :type   DPi1: float
 
+        :params osamp: Oversampling factor in zeta calculation
+        :type   osamp: int
+
     """
    
    # N = (delta_nu*1e-6)/(DPi1 * (nu_p*1e-6)**2)
@@ -624,18 +627,25 @@ def interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1, plot=F
     #zeta_max = (1 + (coupling/N))**-1
     #zeta_min = (1 + (1/(coupling*N)))**-1
 
+    bw = np.mean(np.diff(frequency))
+
+    if osamp == 1:
+        new_frequency = deepcopy(frequency)
+    else:
+        new_frequency = np.arange(frequency.min(), frequency.max(), bw/float(osamp))
+
     # Compute zeta over each radial order
-    model, zeta_max = _interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, 
+    model, zeta_max = _interpolated_zeta(new_frequency, delta_nu, nu_zero, nu_p, 
                          coupling, DPi1, plot=plot)
 
     # Interpolate zeta_max across all frequency
     # TODO: 27/12/2020 why nu_p? Should it be nu_zero?
-    backg = np.interp(frequency, nu_p, zeta_max)
+    backg = np.interp(new_frequency, nu_p, zeta_max)
     
     # Add background back into zeta
     full_model = model - (1 - backg)
     
-    return full_model #, zeta_max, zeta_min
+    return new_frequency, full_model #, zeta_max, zeta_min
 
 
 def zeta_interp(freq, nu_zero, nu_p, delta_nu, 
@@ -677,12 +687,13 @@ def stretched_pds(frequency, zeta, oversample=1):
     bw = frequency[1]-frequency[0]
 
     # Compute dtau
-    if oversample > 1:
-        frequency = np.arange(frequency.min(), frequency.max(), bw/oversample)
-        zeta = np.interp(frequency, frequency, zeta)
-        dtau = 1 / (zeta*(frequency*1e-6)**2)
-    else:
-        dtau = 1 / (zeta*(frequency*1e-6)**2)
+        
+    #if oversample > 1:
+    #    frequency = np.arange(frequency.min(), frequency.max(), bw/oversample)
+    #    zeta = np.interp(frequency, frequency, zeta)
+    #    dtau = 1 / (zeta*(frequency*1e-6)**2)
+    #else:
+    dtau = 1 / (zeta*(frequency*1e-6)**2)
     
 
     #dtau[np.isnan(dtau)] = 0

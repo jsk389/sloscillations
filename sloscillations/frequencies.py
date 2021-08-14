@@ -44,6 +44,7 @@ class Frequencies(object):
         self.vis2 = None
         self.vis3 = None
         self.T = None
+        self.osamp = 1
 
     def __init__(self, frequency, numax, **kwargs):
 
@@ -194,6 +195,7 @@ class Frequencies(object):
         #print(n, self.n)
 
         self.l1_nom_freqs, self.l1_l = self.asymptotic_expression(l=1, d0l=self.d01, n=self.n)
+        #print(f"Nominal p-mode freqs: {self.l1_nom_freqs}")
         tmp = pd.DataFrame(data=np.c_[self.n.astype(int), 
                                       [-1]*len(self.l1_nom_freqs), 
                                       np.nan*np.ones_like(self.l1_nom_freqs),
@@ -229,7 +231,7 @@ class Frequencies(object):
         self.l1_np = self.l1_np[cond] + self.n.min()
 
         # Create zeta
-        self.l1_zeta = np.interp(self.l1_mixed_freqs, self.frequency, self.zeta)
+        self.l1_zeta = np.interp(self.l1_mixed_freqs, self.osamp_frequency, self.zeta)
 
         # Still need to assign radial  order to mixed modes!
         tmp = pd.DataFrame(data=np.c_[self.l1_np,
@@ -311,8 +313,9 @@ class Frequencies(object):
         # to interpolate to compute tau for m=+/-1
     
         if compute_all_tau:
-            self.new_frequency, self.tau, self.new_zeta = mixed_modes.stretched_pds(self.frequency, 
-                                                                                     self.zeta)
+            self.new_frequency, self.tau, self.new_zeta = mixed_modes.stretched_pds(self.osamp_frequency, 
+                                                                                     self.zeta)#,
+                                                                                     #oversample=self.osamp)
                                                                                     
         if self.calc_mixed:
             self.l1_mixed_tau = mixed_modes.peaks_stretched_period(self.l1_mixed_freqs, 
@@ -414,15 +417,16 @@ class Frequencies(object):
             self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
         
         # Compute zeta
-        self.zeta = mixed_modes.interpolated_zeta(
-                                                  self.frequency,
-                                                  self.delta_nu_indiv,
-                                                  self.l0_freqs,
-                                                  self.l1_nom_freqs,
-                                                  self.coupling,
-                                                  self.DPi1,
-                                                  plot=False,
-                                                )
+        self.osamp_frequency, self.zeta = mixed_modes.interpolated_zeta(
+                                                        self.frequency,
+                                                        self.delta_nu_indiv,
+                                                        self.l0_freqs,
+                                                        self.l1_nom_freqs,
+                                                        self.coupling,
+                                                        self.DPi1,
+                                                        self.osamp,
+                                                        plot=False,
+                                                        )
 
         # l=1 mixed modes
         if self.calc_mixed:
