@@ -45,6 +45,7 @@ class Frequencies(object):
         self.vis3 = None
         self.T = None
         self.osamp = 1
+        self.store_mode_data = False
 
     def __init__(self, frequency, numax, **kwargs):
 
@@ -149,23 +150,27 @@ class Frequencies(object):
         Generate l=0 mode frequencies
         """
         self.l0_freqs, self.l0_l = self.asymptotic_expression(l=0)
-        self.mode_data = pd.DataFrame(data=np.c_[self.n.astype(int), 
-                                            self.l0_l.astype(int), 
-                                            np.nan*np.ones_like(self.l0_freqs),
-                                            self.l0_freqs], 
-                                       columns=['n', 'l', 'm', 'frequency'])
+
+        if self.store_mode_data:
+            self.mode_data = pd.DataFrame(data=np.c_[self.n.astype(int), 
+                                                self.l0_l.astype(int), 
+                                                np.nan*np.ones_like(self.l0_freqs),
+                                                self.l0_freqs], 
+                                        columns=['n', 'l', 'm', 'frequency'])
         
     def generate_quadrupole_modes(self):
         """
         Generate l=2 mode frequencies
         """
         self.l2_freqs, self.l2_l = self.asymptotic_expression(l=2, d0l=self.d02, n=self.n-1)
-        tmp = pd.DataFrame(data=np.c_[(self.n - 1).astype(int), 
-                                      self.l2_l.astype(int), 
-                                      np.nan*np.ones_like(self.l2_freqs),
-                                      self.l2_freqs], 
-                           columns=['n', 'l', 'm', 'frequency'])         
-        self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
+
+        if self.store_mode_data:
+            tmp = pd.DataFrame(data=np.c_[(self.n - 1).astype(int), 
+                                        self.l2_l.astype(int), 
+                                        np.nan*np.ones_like(self.l2_freqs),
+                                        self.l2_freqs], 
+                            columns=['n', 'l', 'm', 'frequency'])         
+            self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
 
     def generate_octupole_modes(self):
         """
@@ -177,13 +182,13 @@ class Frequencies(object):
         #cond = (self.l3_freqs > self.l0_freqs.min()) & (self.l3_freqs < self.l0_freqs.max())
         #self.l3_freqs = self.l3_freqs[cond]
         #self.l3_l = self.l3_l[cond]
-
-        tmp = pd.DataFrame(data=np.c_[(self.n - 1).astype(int), 
-                                      self.l3_l.astype(int), 
-                                      np.nan*np.ones_like(self.l3_freqs),
-                                      self.l3_freqs], 
-                           columns=['n', 'l', 'm', 'frequency'])         
-        self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)  
+        if self.store_mode_data:
+            tmp = pd.DataFrame(data=np.c_[(self.n - 1).astype(int), 
+                                        self.l3_l.astype(int), 
+                                        np.nan*np.ones_like(self.l3_freqs),
+                                        self.l3_freqs], 
+                            columns=['n', 'l', 'm', 'frequency'])         
+            self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)  
 
     def generate_nominal_dipole_modes(self):
         """
@@ -196,12 +201,13 @@ class Frequencies(object):
 
         self.l1_nom_freqs, self.l1_l = self.asymptotic_expression(l=1, d0l=self.d01, n=self.n)
         #print(f"Nominal p-mode freqs: {self.l1_nom_freqs}")
-        tmp = pd.DataFrame(data=np.c_[self.n.astype(int), 
-                                      [-1]*len(self.l1_nom_freqs), 
-                                      np.nan*np.ones_like(self.l1_nom_freqs),
-                                      self.l1_nom_freqs], 
-                           columns=['n', 'l', 'm', 'frequency'])         
-        self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
+        if self.store_mode_data:
+            tmp = pd.DataFrame(data=np.c_[self.n.astype(int), 
+                                        [-1]*len(self.l1_nom_freqs), 
+                                        np.nan*np.ones_like(self.l1_nom_freqs),
+                                        self.l1_nom_freqs], 
+                            columns=['n', 'l', 'm', 'frequency'])         
+            self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
 
     def generate_mixed_dipole_modes(self, DPi1, coupling, eps_g, nom_p):
         """
@@ -233,15 +239,16 @@ class Frequencies(object):
         # Create zeta
         self.l1_zeta = np.interp(self.l1_mixed_freqs, self.osamp_frequency, self.zeta)
 
-        # Still need to assign radial  order to mixed modes!
-        tmp = pd.DataFrame(data=np.c_[self.l1_np,
-                                      [1]*len(self.l1_mixed_freqs), 
-                                      [0]*len(self.l1_mixed_freqs),
-                                      self.l1_mixed_freqs,
-                                      self.l1_ng, #np.arange(0, len(self.l1_mixed_freqs), 1), 
-                                      self.l1_zeta], 
-                           columns=['n', 'l', 'm', 'frequency', 'n_g', 'zeta'])         
-        self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
+        if self.store_mode_data:
+            # Still need to assign radial  order to mixed modes!
+            tmp = pd.DataFrame(data=np.c_[self.l1_np,
+                                        [1]*len(self.l1_mixed_freqs), 
+                                        [0]*len(self.l1_mixed_freqs),
+                                        self.l1_mixed_freqs,
+                                        self.l1_ng, #np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                        self.l1_zeta], 
+                            columns=['n', 'l', 'm', 'frequency', 'n_g', 'zeta'])         
+            self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
 
     def generate_rotational_splittings(self, split_core, DPi1=80.0, coupling=0.2, eps_g=0.0, split_env=0., l=1, 
                                        method='simple'):
@@ -257,22 +264,24 @@ class Frequencies(object):
                 splitting = (split_core - split_env) * self.l1_zeta + split_env
                 self.l1_mixed_freqs_p1 = self.l1_mixed_freqs + splitting
                 self.l1_mixed_freqs_n1 = self.l1_mixed_freqs - splitting
-                tmp = pd.DataFrame(data=np.c_[self.l1_np,
-                                              [1]*len(self.l1_mixed_freqs), 
-                                              [+1]*len(self.l1_mixed_freqs),
-                                              self.l1_mixed_freqs_p1,
-                                              self.l1_ng, #np.arange(0, len(self.l1_mixed_freqs), 1), 
-                                              self.l1_zeta], 
-                                   columns=['n', 'l', 'm', 'frequency', 'n_g', 'zeta'])         
-                self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)           
-                tmp = pd.DataFrame(data=np.c_[self.l1_np,
-                                              [1]*len(self.l1_mixed_freqs), 
-                                              [-1]*len(self.l1_mixed_freqs),
-                                              self.l1_mixed_freqs_n1,
-                                              self.l1_ng, #np.arange(0, len(self.l1_mixed_freqs), 1), 
-                                              self.l1_zeta], 
-                                   columns=['n', 'l', 'm', 'frequency', 'n_g', 'zeta'])         
-                self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
+
+                if self.store_mode_data:
+                    tmp = pd.DataFrame(data=np.c_[self.l1_np,
+                                                [1]*len(self.l1_mixed_freqs), 
+                                                [+1]*len(self.l1_mixed_freqs),
+                                                self.l1_mixed_freqs_p1,
+                                                self.l1_ng, #np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                                self.l1_zeta], 
+                                    columns=['n', 'l', 'm', 'frequency', 'n_g', 'zeta'])         
+                    self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)           
+                    tmp = pd.DataFrame(data=np.c_[self.l1_np,
+                                                [1]*len(self.l1_mixed_freqs), 
+                                                [-1]*len(self.l1_mixed_freqs),
+                                                self.l1_mixed_freqs_n1,
+                                                self.l1_ng, #np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                                self.l1_zeta], 
+                                    columns=['n', 'l', 'm', 'frequency', 'n_g', 'zeta'])         
+                    self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
 
             elif method == 'Mosser':
                 # User method from Mosser et al. (2019)
@@ -287,20 +296,22 @@ class Frequencies(object):
                     self.l1_int_zeta_p, self.l1_int_zeta_n = mixed_modes.l1_theoretical_rot_M(self.l1_mixed_freqs,
                                                                                               split_core, 
                                                                                               zeta_func)
-                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
-                                    [1]*len(self.l1_mixed_freqs), 
-                                    [+1]*len(self.l1_mixed_freqs),
-                                    self.l1_mixed_freqs_p1,
-                                    self.l1_int_zeta_p], 
-                    columns=['n', 'l', 'm', 'frequency', 'zeta'])   
-                self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)                
-                tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
-                                              [1]*len(self.l1_mixed_freqs), 
-                                              [-1]*len(self.l1_mixed_freqs),
-                                              self.l1_mixed_freqs_n1,
-                                              self.l1_int_zeta_n], 
-                                columns=['n', 'l', 'm', 'frequency', 'zeta'])         
-                self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
+                
+                if self.store_mode_data:
+                    tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                        [1]*len(self.l1_mixed_freqs), 
+                                        [+1]*len(self.l1_mixed_freqs),
+                                        self.l1_mixed_freqs_p1,
+                                        self.l1_int_zeta_p], 
+                        columns=['n', 'l', 'm', 'frequency', 'zeta'])   
+                    self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)                
+                    tmp = pd.DataFrame(data=np.c_[np.arange(0, len(self.l1_mixed_freqs), 1), 
+                                                [1]*len(self.l1_mixed_freqs), 
+                                                [-1]*len(self.l1_mixed_freqs),
+                                                self.l1_mixed_freqs_n1,
+                                                self.l1_int_zeta_n], 
+                                    columns=['n', 'l', 'm', 'frequency', 'zeta'])         
+                    self.mode_data = self.mode_data.append(tmp, ignore_index=True, sort=True)
             else:
                 sys.exit("Oh dear, method keyword isn't correct!")
         else:

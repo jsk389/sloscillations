@@ -130,6 +130,9 @@ def find_mixed_l1_freqs_Hekker(delta_nu, nu_zero, nu_p, DPi1, eps_g, coupling):
     idx = np.argsort(frequencies[np.isfinite(frequencies)])
     return frequencies[np.isfinite(frequencies)][idx], g_mode_freqs[np.isfinite(frequencies)][idx], N_g[np.isfinite(frequencies)][idx]
 
+from numba import njit, jit
+
+@njit(fastmath=True)
 def opt_funcM(nu, nu_g, pzero, pone, DPi1, coupling):
     theta_p = (np.pi / (pzero[1]-pzero[0])) * (nu - pone)
     theta_g = np.pi/DPi1 * 1e6 * (1/nu - 1/nu_g) + np.pi/2
@@ -150,25 +153,40 @@ def find_mixed_l1_freq_Mosser2018_update_(delta_nu, pzero, pone, DPi1, eps_g, co
     #f = np.linspace(pzero[0], pzero[1], 10000)#[1:-1]
     #dnu = np.diff(pzero)
     solns = []
+    # print(pzero[0], pzero[1], lower_bound)
+    # Clip upper and lower bounds to be within current radial order
+    upper_bound = np.clip(upper_bound, a_min=pzero[0], a_max=pzero[1])
+    lower_bound = np.clip(lower_bound, a_min=pzero[0], a_max=pzero[1])
+    cond = (upper_bound > lower_bound)
+    nu_g = nu_g[cond]
+    lower_bound = lower_bound[cond]
+    upper_bound = upper_bound[cond]
+    # #print(upper_bound)
+    # print(lower_bound)
+    # sys.exit()
     #solns = np.zeros(len(nu_g))
+    # Vectorised linspace
+    ff2 = np.linspace(lower_bound, upper_bound, 1000)
     for i in range(len(nu_g)):
-        #print(upper_bound[i], lower_bound[i], pzero)
-        if (upper_bound[i] > pzero[1]):
-            #print("BEFORE UPP: ", upper_bound)
-            upper_bound[i] = pzero[1]# + 0.05*dnu# - np.finfo(float).eps*1e4
-            #print("AFTER UPP: ", upper_bound)
-        elif (lower_bound[i] < pzero[0]):
-            #print("BEFORE LOW: ", lower_bound)
-            lower_bound[i] = pzero[0]# - 0.05*dnu# + np.finfo(float).eps*1e4
-            #print("AFTER LOW: ", lower_bound)
-        #print(upper_bound[i], lower_bound[i], pzero)
-        if (upper_bound[i] < lower_bound[i]) or (lower_bound[i] > upper_bound[i]):
-            #print("Bad boundary conditions")
-            pass
-        else:
+        # #print(upper_bound[i], lower_bound[i], pzero)
+        # if (upper_bound[i] > pzero[1]):
+        #     #print("BEFORE UPP: ", upper_bound)
+        #     upper_bound[i] = pzero[1]# + 0.05*dnu# - np.finfo(float).eps*1e4
+        #     #print("AFTER UPP: ", upper_bound)
+        # elif (lower_bound[i] < pzero[0]):
+        #     #print("BEFORE LOW: ", lower_bound)
+        #     lower_bound[i] = pzero[0]# - 0.05*dnu# + np.finfo(float).eps*1e4
+        #     #print("AFTER LOW: ", lower_bound)
+        # #print(upper_bound[i], lower_bound[i], pzero)
+        # if (upper_bound[i] < lower_bound[i]) or (lower_bound[i] > upper_bound[i]):
+        #     #print("Bad boundary conditions")
+        #     pass
+        # else:
             #print("Valid")
-            ff = np.linspace(lower_bound[i], upper_bound[i], 1000)
-            y = opt_funcM(ff, nu_g[i], pzero, pone, DPi1, coupling)
+           # ff = np.linspace(lower_bound[i], upper_bound[i], 1000)
+            #print(np.all(ff == ff2[:,i]))
+
+            y = opt_funcM(ff2[:,i], nu_g[i], pzero, pone, DPi1, coupling)
     
             
 
@@ -177,10 +195,11 @@ def find_mixed_l1_freq_Mosser2018_update_(delta_nu, pzero, pone, DPi1, eps_g, co
             #    soln = np.array([])
             #else:
             #    soln = ff[idx]
-            
-            if len(idx) > 0:
-                solns = np.append(solns, ff[idx])
+            #if len(idx) > 0:
+            solns.append(ff2[idx,i])
 
+    #print(solns)
+    solns = np.hstack(solns)
     #solns = np.stack(solns)
     #print(solns)
 
@@ -627,25 +646,35 @@ def interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, coupling, DPi1,
     #zeta_max = (1 + (coupling/N))**-1
     #zeta_min = (1 + (1/(coupling*N)))**-1
 
-    bw = np.mean(np.diff(frequency))
+    bw = frequency[1] - frequency[0] #np.mean(np.diff(frequency))
 
-    if osamp == 1:
-        new_frequency = deepcopy(frequency)
-    else:
+    if osamp != 1:
         new_frequency = np.arange(frequency.min(), frequency.max(), bw/float(osamp))
+        # Compute zeta over each radial order
+        model, zeta_max = _interpolated_zeta(new_frequency, delta_nu, nu_zero, nu_p, 
+                            coupling, DPi1, plot=plot)
 
-    # Compute zeta over each radial order
-    model, zeta_max = _interpolated_zeta(new_frequency, delta_nu, nu_zero, nu_p, 
-                         coupling, DPi1, plot=plot)
+        # Interpolate zeta_max across all frequency
+        # TODO: 27/12/2020 why nu_p? Should it be nu_zero?
+        backg = np.interp(new_frequency, nu_p, zeta_max)
+        
+        # Add background back into zeta
+        full_model = model - (1 - backg)
+        
+        return new_frequency, full_model #, zeta_max, zeta_min
+    else:
+        # Compute zeta over each radial order
+        model, zeta_max = _interpolated_zeta(frequency, delta_nu, nu_zero, nu_p, 
+                            coupling, DPi1, plot=plot)
 
-    # Interpolate zeta_max across all frequency
-    # TODO: 27/12/2020 why nu_p? Should it be nu_zero?
-    backg = np.interp(new_frequency, nu_p, zeta_max)
-    
-    # Add background back into zeta
-    full_model = model - (1 - backg)
-    
-    return new_frequency, full_model #, zeta_max, zeta_min
+        # Interpolate zeta_max across all frequency
+        # TODO: 27/12/2020 why nu_p? Should it be nu_zero?
+        backg = np.interp(frequency, nu_p, zeta_max)
+        
+        # Add background back into zeta
+        full_model = model - (1 - backg)
+        
+        return frequency, full_model #, zeta_max, zeta_min
 
 
 def zeta_interp(freq, nu_zero, nu_p, delta_nu, 
